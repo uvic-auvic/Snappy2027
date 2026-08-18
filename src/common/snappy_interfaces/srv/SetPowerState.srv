@@ -1,0 +1,12 @@
+# Request to change the state of a specific power rail
+
+# Rail Constants
+uint8 RAIL_12V = 1
+uint8 RAIL_5V = 2
+uint8 RAIL_JETSON = 3
+
+uint8 target_rail
+bool enable  # True to turn on, False to turn off
+---
+bool success
+string message  # Human-readable result or error
