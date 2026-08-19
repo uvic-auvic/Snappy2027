@@ -14,6 +14,7 @@ find_package(geometry_msgs REQUIRED)
 
 set(msg_files
   "msg/Pose.msg"
+  "msg/Task.msg"
   "msg/ThrusterCommand.msg"
   "msg/MowerBoardStatus.msg"
 )
