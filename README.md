@@ -12,3 +12,20 @@ Initial software is being migrated from:
 - Historical tag: `robosub-2026-latest`
 
 Simulation and embedded firmware are maintained separately from this repository.
+
+## Docker
+
+For an x86_64 Linux development machine:
+
+```bash
+./scripts/setup_docker.sh
+```
+
+For the Jetson Orin running JetPack 6:
+
+```bash
+./scripts/setup_docker_jetson.sh
+```
+
+See [docs/docker.md](docs/docker.md) for manual commands, hardware access, and
+container verification.

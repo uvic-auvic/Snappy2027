@@ -1,0 +1,52 @@
+# === ROS 2 Build Files ===
+*build/
+*install/
+*log/
+# === CMake and Colcon Caches ===
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+ament_cmake_environment_hooks/
+.colcon/
+color/
+depth/
+edges/
+
+# === ROS 2 Launch/Params/Generated ===
+*.launch.py~
+*.launch.xml~
+*.yaml~
+*.params.yaml~
+
+# === General ===
+*.pyc
+*.pyo
+__pycache__/
+*.swp
+*.swo
+.DS_STORE
+.DS_Store
+
+# === Large mesh / hydrodynamics artifacts ===
+src/snappy_cpp/worlds/2025-2026_Full_ASSEMBLY.dae
+src/snappy_cpp/worlds/2025-2026_Full_ASSEMBLY*.stl
+src/snappy_cpp/worlds/2025-2026_Full_ASSEMBLY*.vtp
+src/snappy_cpp/worlds/added_mass_inf.*
+src/snappy_cpp/worlds/boundary_edges.*
+src/snappy_cpp/worlds/hydro_plugin_snippet.sdf
+src/snappy_cpp/worlds/quad_test.stl
+src/snappy_cpp/worlds/raw_parts/
+
+/color
+/depth
+/edges
+
+# === IDE/Editor Specific ===
+
+# VS C
+models/*.engine
+snappy_inference/
+
+# Third-party ROS repositories populated by vcstool.
+/src/external/
