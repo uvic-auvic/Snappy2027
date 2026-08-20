@@ -1,0 +1,9 @@
+# Execute a predefined mission or set of waypoints
+
+string mission_name
+---
+bool success
+string error_message
+---
+float32 progress_percentage
+string current_task

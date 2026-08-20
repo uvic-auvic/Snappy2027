@@ -1,0 +1,54 @@
+name: snappy2027
+
+services:
+  snappy-dev:
+    image: nil2thrill/snappy-ros:humble
+    container_name: snappy2027-dev
+    working_dir: /ros2_ws
+    volumes:
+      - ..:/ros2_ws
+      - snappy_dev_build:/ros2_ws/build
+      - snappy_dev_install:/ros2_ws/install
+      - snappy_dev_log:/ros2_ws/log
+      - /dev:/dev
+    privileged: true
+    network_mode: host
+    stdin_open: true
+    tty: true
+    command: /bin/bash
+
+  snappy-jetson:
+    profiles: ["jetson"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.jetson
+    image: snappy2027:humble-jetson
+    container_name: snappy2027-jetson
+    working_dir: /ros2_ws
+    runtime: nvidia
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+      DISPLAY: ${DISPLAY:-:0}
+    volumes:
+      - ..:/ros2_ws
+      - snappy_jetson_build:/ros2_ws/build
+      - snappy_jetson_install:/ros2_ws/install
+      - snappy_jetson_log:/ros2_ws/log
+      - /dev:/dev
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /tmp/argus_socket:/tmp/argus_socket
+    privileged: true
+    network_mode: host
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    command: /bin/bash
+
+volumes:
+  snappy_dev_build:
+  snappy_dev_install:
+  snappy_dev_log:
+  snappy_jetson_build:
+  snappy_jetson_install:
+  snappy_jetson_log:
