@@ -29,3 +29,25 @@ For the Jetson Orin running JetPack 6:
 
 See [docs/docker.md](docs/docker.md) for manual commands, hardware access, and
 container verification.
+
+## Setup
+
+### Source the setup files
+
+Run this command on every new shell to access ROS 2 commands.
+
+```bash
+source /opt/ros/humble/setup.bash
+```
+
+### Build the workspace
+
+In the root of the workspace, run `colcon build`
+
+### Source the environment
+
+After colcon build is completed successfully, the output will be in the `install` directory. colcon will have generated bash/bat files in the `install` directory to help set up the environment. Run the following command to source the environment:
+
+```bash
+source install/setup.bash
+```
