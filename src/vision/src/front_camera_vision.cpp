@@ -57,21 +57,42 @@ public:
         engine_path_ = this->declare_parameter<std::string>(
             "engine_path", "/home/kraken/Desktop/ffc_rs_26.engine");
         num_classes_ = this->declare_parameter<int>("num_classes", 8);
-        video_capture_enabled_ = this->declare_parameter<bool>("video_capture_enabled", true);
+        camera_name_ = this->declare_parameter<std::string>("camera_name", "front");
+        capture_target_ = this->declare_parameter<std::string>("capture_target", "both");
+        capture_mode_ = this->declare_parameter<std::string>("capture_mode", "video");
+        video_capture_enabled_ = this->declare_parameter<bool>(
+            "video_capture_enabled",
+            capture_mode_ == "video");
+        image_capture_dir_ = this->declare_parameter<std::string>(
+            "image_capture_directory", "/home/snappy_data/front_camera/images");
         video_capture_dir_ = this->declare_parameter<std::string>(
-            "video_capture_directory", "/home/snappy_data/front_camera");
+            "video_capture_directory", "/home/snappy_data/front_camera/videos");
         video_capture_fps_ = this->declare_parameter<double>("video_capture_fps", 30.0);
+
+        capture_enabled_ = (capture_target_ == "both" || capture_target_ == camera_name_);
+
+        if (capture_mode_ != "image" && capture_mode_ != "video") {
+            RCLCPP_WARN(get_logger(), "Unsupported capture_mode '%s'; defaulting to 'video'",
+                        capture_mode_.c_str());
+            capture_mode_ = "video";
+        }
+        if (capture_mode_ == "video") {
+            video_capture_enabled_ = capture_enabled_;
+        } else {
+            video_capture_enabled_ = false;
+        }
 
         RCLCPP_INFO(get_logger(), "Front Camera Vision (YOLOv26 Seg) initializing...");
         RCLCPP_INFO(get_logger(), "  inference_hz: %.1f", inference_hz_);
         RCLCPP_INFO(get_logger(), "  conf_threshold: %.2f", conf_threshold_);
         RCLCPP_INFO(get_logger(), "  engine_path: %s", engine_path_.c_str());
+        RCLCPP_INFO(get_logger(), "  camera_name: %s", camera_name_.c_str());
+        RCLCPP_INFO(get_logger(), "  capture_target: %s", capture_target_.c_str());
+        RCLCPP_INFO(get_logger(), "  capture_mode: %s", capture_mode_.c_str());
+        RCLCPP_INFO(get_logger(), "  capture_enabled: %s", capture_enabled_ ? "true" : "false");
         RCLCPP_INFO(get_logger(), "  video_capture_enabled: %s", video_capture_enabled_ ? "true" : "false");
+        RCLCPP_INFO(get_logger(), "  image_capture_directory: %s", image_capture_dir_.c_str());
         RCLCPP_INFO(get_logger(), "  video_capture_directory: %s", video_capture_dir_.c_str());
-
-        if (video_capture_enabled_) {
-            start_video_capture();
-        }
 
         init_tensorrt();
 
@@ -180,11 +201,8 @@ private:
             job.depth_encoding = depth_msg->encoding;
             job.timestamp = rclcpp::Time(color_msg->header.stamp.sec, color_msg->header.stamp.nanosec);
 
-            if (video_capture_enabled_) {
-                std::lock_guard<std::mutex> video_lock(video_mutex_);
-                if (video_writer_.isOpened()) {
-                    video_writer_ << job.image;
-                }
+            if (capture_enabled_) {
+                write_capture_frame(job.image, job.timestamp);
             }
 
             {
@@ -225,17 +243,38 @@ private:
             for (auto & det : detections) {
                 det.distance_m = estimate_distance_m(job.depth_image, job.depth_encoding, det);
             }
-            // Save a frame for later review, at most once every 5 seconds.
-            const double frame_s = job.timestamp.seconds();
-            if (frame_s - last_save_s_ >= 5.0) {
-                last_save_s_ = frame_s;
-                save_image(job.image, job.timestamp);
+            if (capture_mode_ == "image" && capture_enabled_) {
+                const double frame_s = job.timestamp.seconds();
+                if (frame_s - last_save_s_ >= 5.0) {
+                    last_save_s_ = frame_s;
+                    save_image(job.image, job.timestamp);
+                }
             }
             publish_detections(detections, job.timestamp, inference_ms);
         }
     }
 
-    void start_video_capture()
+    void write_capture_frame(const cv::Mat &image, const rclcpp::Time &timestamp)
+    {
+        if (capture_mode_ == "video") {
+            std::lock_guard<std::mutex> video_lock(video_mutex_);
+            if (!video_writer_.isOpened()) {
+                start_video_capture(image);
+            }
+            if (video_writer_.isOpened()) {
+                video_writer_ << image;
+            }
+            return;
+        }
+
+        const double frame_s = timestamp.seconds();
+        if (frame_s - last_save_s_ >= 5.0) {
+            last_save_s_ = frame_s;
+            save_image(image, timestamp);
+        }
+    }
+
+    void start_video_capture(const cv::Mat &frame)
     {
         std::filesystem::create_directories(video_capture_dir_, std::error_code{});
 
@@ -249,7 +288,7 @@ private:
         video_path_ = (std::filesystem::path(video_capture_dir_) / ("front_camera_" + timestamp.str() + ".mp4")).string();
 
         int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
-        video_writer_ = cv::VideoWriter(video_path_, fourcc, video_capture_fps_, cv::Size(848, 480));
+        video_writer_ = cv::VideoWriter(video_path_, fourcc, video_capture_fps_, cv::Size(frame.cols, frame.rows));
         if (!video_writer_.isOpened()) {
             RCLCPP_WARN(get_logger(), "Failed to open video writer at %s", video_path_.c_str());
             video_capture_enabled_ = false;
@@ -262,15 +301,12 @@ private:
     // take image and save to desktop
     void save_image(const cv::Mat &image, const rclcpp::Time &timestamp)
     {
-        // imwrite does NOT create directories and returns false (never throws)
-        // on a bad path -- so the dir must exist first, and we check the result.
-        static const std::string dir = "/ros2_ws/snappy_inference/d455";
-        std::error_code ec;
-        std::filesystem::create_directories(dir, ec);
+        std::filesystem::create_directories(image_capture_dir_, std::error_code{});
         const std::string path =
-            dir + "/front_camera_" + std::to_string(timestamp.seconds()) + ".jpg";
-        if (!cv::imwrite(path, image)) {
-            RCLCPP_WARN(get_logger(), "save_image: failed to write %s", path.c_str());
+            std::filesystem::path(image_capture_dir_) /
+            ("front_camera_" + std::to_string(timestamp.seconds()) + ".jpg");
+        if (!cv::imwrite(path.string(), image)) {
+            RCLCPP_WARN(get_logger(), "save_image: failed to write %s", path.string().c_str());
         }
     }
 
@@ -741,7 +777,8 @@ private:
 
     // Video capture
     bool video_capture_enabled_ = true;
-    std::string video_capture_dir_ = "/home/snappy_data/front_camera";
+    std::string image_capture_dir_ = "/home/snappy_data/front_camera/images";
+    std::string video_capture_dir_ = "/home/snappy_data/front_camera/videos";
     double video_capture_fps_ = 30.0;
     std::string video_path_;
     cv::VideoWriter video_writer_;
@@ -758,6 +795,10 @@ private:
     double      inference_hz_    = 10.0;
     double      conf_threshold_  = 0.5;
     int         num_classes_     = 80;
+    std::string camera_name_ = "front";
+    std::string capture_target_ = "both";
+    std::string capture_mode_ = "video";
+    bool capture_enabled_ = true;
     std::string engine_path_;
     std::optional<rclcpp::Time> last_inference_time_;
     double last_save_s_ = 0.0;
