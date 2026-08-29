@@ -21,9 +21,11 @@
 #include <deque>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <sstream>
 #include <thread>
 #include <vector>
 #include <algorithm>
@@ -55,11 +57,21 @@ public:
         engine_path_ = this->declare_parameter<std::string>(
             "engine_path", "/home/kraken/Desktop/ffc_rs_26.engine");
         num_classes_ = this->declare_parameter<int>("num_classes", 8);
+        video_capture_enabled_ = this->declare_parameter<bool>("video_capture_enabled", true);
+        video_capture_dir_ = this->declare_parameter<std::string>(
+            "video_capture_directory", "/home/snappy_data/front_camera");
+        video_capture_fps_ = this->declare_parameter<double>("video_capture_fps", 30.0);
 
         RCLCPP_INFO(get_logger(), "Front Camera Vision (YOLOv26 Seg) initializing...");
         RCLCPP_INFO(get_logger(), "  inference_hz: %.1f", inference_hz_);
         RCLCPP_INFO(get_logger(), "  conf_threshold: %.2f", conf_threshold_);
         RCLCPP_INFO(get_logger(), "  engine_path: %s", engine_path_.c_str());
+        RCLCPP_INFO(get_logger(), "  video_capture_enabled: %s", video_capture_enabled_ ? "true" : "false");
+        RCLCPP_INFO(get_logger(), "  video_capture_directory: %s", video_capture_dir_.c_str());
+
+        if (video_capture_enabled_) {
+            start_video_capture();
+        }
 
         init_tensorrt();
 
@@ -88,6 +100,14 @@ public:
 
     ~FrontCameraVision() override
     {
+        {
+            std::lock_guard<std::mutex> lock(video_mutex_);
+            if (video_writer_.isOpened()) {
+                video_writer_.release();
+                RCLCPP_INFO(get_logger(), "Video capture stopped: %s", video_path_.c_str());
+            }
+        }
+
         worker_running_ = false;
         queue_cv_.notify_all();
         if (worker_thread_.joinable()) {
@@ -160,6 +180,13 @@ private:
             job.depth_encoding = depth_msg->encoding;
             job.timestamp = rclcpp::Time(color_msg->header.stamp.sec, color_msg->header.stamp.nanosec);
 
+            if (video_capture_enabled_) {
+                std::lock_guard<std::mutex> video_lock(video_mutex_);
+                if (video_writer_.isOpened()) {
+                    video_writer_ << job.image;
+                }
+            }
+
             {
                 std::lock_guard<std::mutex> lock(queue_mutex_);
                 // Drop oldest frame if queue is full (never accumulate latency)
@@ -206,6 +233,30 @@ private:
             }
             publish_detections(detections, job.timestamp, inference_ms);
         }
+    }
+
+    void start_video_capture()
+    {
+        std::filesystem::create_directories(video_capture_dir_, std::error_code{});
+
+        const auto now = std::chrono::system_clock::now();
+        const auto tt = std::chrono::system_clock::to_time_t(now);
+        std::tm tm_buf{};
+        localtime_r(&tt, &tm_buf);
+
+        std::ostringstream timestamp;
+        timestamp << std::put_time(&tm_buf, "%Y%m%d_%H%M%S");
+        video_path_ = (std::filesystem::path(video_capture_dir_) / ("front_camera_" + timestamp.str() + ".mp4")).string();
+
+        int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
+        video_writer_ = cv::VideoWriter(video_path_, fourcc, video_capture_fps_, cv::Size(848, 480));
+        if (!video_writer_.isOpened()) {
+            RCLCPP_WARN(get_logger(), "Failed to open video writer at %s", video_path_.c_str());
+            video_capture_enabled_ = false;
+            return;
+        }
+
+        RCLCPP_INFO(get_logger(), "Video capture enabled: %s", video_path_.c_str());
     }
 
     // take image and save to desktop
@@ -687,6 +738,14 @@ private:
     int    input_w_ = 640, input_h_ = 640;
     size_t output0_size_ = 0, output1_size_ = 0;
     int    num_detections_ = 0, det_attrs_ = 0;
+
+    // Video capture
+    bool video_capture_enabled_ = true;
+    std::string video_capture_dir_ = "/home/snappy_data/front_camera";
+    double video_capture_fps_ = 30.0;
+    std::string video_path_;
+    cv::VideoWriter video_writer_;
+    std::mutex video_mutex_;
 
     // Threading
     std::deque<InferenceJob>   job_queue_;

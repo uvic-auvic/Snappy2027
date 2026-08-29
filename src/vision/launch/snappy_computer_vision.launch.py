@@ -98,7 +98,12 @@ def generate_launch_description():
                 executable="front_camera_vision",
                 name="front_camera_vision",
                 output="screen",
-                parameters=[{"engine_path": "/ros2_ws/models/ffc_rs_26.engine"}],
+                parameters=[{
+                    "engine_path": "/ros2_ws/models/ffc_rs_26.engine",
+                    "video_capture_enabled": True,
+                    "video_capture_directory": "/home/snappy_data/front_camera",
+                    "video_capture_fps": 30.0,
+                }],
             )
         ],
     )
@@ -124,6 +129,5 @@ def generate_launch_description():
             d405_launch,
             front_camera_vision,
             bottom_camera_vision,
-            
         ]
     )
