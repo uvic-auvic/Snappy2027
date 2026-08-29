@@ -18,6 +18,7 @@ find_package(snappy_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 add_library(control_algorithms
   src/pid.cpp
@@ -43,6 +44,19 @@ ament_target_dependencies(controller
 )
 target_link_libraries(controller control_algorithms Eigen3::Eigen)
 
+add_executable(time_based_controller src/time_based_controller.cpp)
+target_include_directories(time_based_controller PRIVATE include)
+ament_target_dependencies(time_based_controller
+  geometry_msgs
+  nav_msgs
+  rclcpp
+  snappy_interfaces
+  std_msgs
+  tf2
+  tf2_geometry_msgs
+)
+target_link_libraries(time_based_controller control_algorithms Eigen3::Eigen yaml-cpp)
+
 install(
   TARGETS control_algorithms
   EXPORT export_control_algorithms
@@ -52,7 +66,7 @@ install(
 )
 
 install(
-  TARGETS controller
+  TARGETS controller time_based_controller
   DESTINATION lib/${PROJECT_NAME}
 )
 
