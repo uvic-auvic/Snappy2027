@@ -6,6 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=all
 
+# Base tools + ROS 2 Humble
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         gnupg \
@@ -33,10 +34,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3-rosdep \
         python3-vcstool \
         ros-dev-tools \
-        ros-humble-micro-ros-agent \
         ros-humble-ros-base && \
     rm -rf /var/lib/apt/lists/*
 
+# Jetson / hardware tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
         can-utils \
         gpiod \
@@ -53,10 +54,48 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/* && \
     pip3 install --no-cache-dir Jetson.GPIO
 
+# Initialize rosdep
 RUN rosdep init 2>/dev/null || true
 
+# --------------------------------------------------------------------------
+# micro-ROS Agent
+# --------------------------------------------------------------------------
+# ros-humble-micro-ros-agent is not available through apt on this Jetson
+# ARM64 environment, so build it from source using AUVic's Humble
+# micro_ros_setup repository.
+#
+# Pin the micro_ros_setup revision so Docker builds remain reproducible.
+ARG MICRO_ROS_SETUP_REF=f8697a3262b0c42caf29052de1adff1561412827
+
+RUN mkdir -p /opt/micro_ros_ws/src && \
+    git clone https://github.com/uvic-auvic/micro_ros_setup.git \
+        /opt/micro_ros_ws/src/micro_ros_setup && \
+    cd /opt/micro_ros_ws/src/micro_ros_setup && \
+    git checkout ${MICRO_ROS_SETUP_REF} && \
+    cd /opt/micro_ros_ws && \
+    apt-get update && \
+    rosdep update --rosdistro humble && \
+    rosdep install \
+        --from-paths src \
+        --ignore-src \
+        --rosdistro humble \
+        -r -y && \
+    . /opt/ros/humble/setup.sh && \
+    colcon build --packages-select micro_ros_setup && \
+    . /opt/micro_ros_ws/install/local_setup.sh && \
+    ros2 run micro_ros_setup create_agent_ws.sh && \
+    ros2 run micro_ros_setup build_agent.sh --executor sequential && \
+    . /opt/micro_ros_ws/install/local_setup.sh && \
+    ros2 pkg prefix micro_ros_agent && \
+    rm -rf /var/lib/apt/lists/* \
+           /opt/micro_ros_ws/build \
+           /opt/micro_ros_ws/log
+
+# Automatically source ROS, micro-ROS, and Snappy2027 when opening a shell
 RUN echo 'source /opt/ros/humble/setup.bash' >> /root/.bashrc && \
+    echo '[ -f /opt/micro_ros_ws/install/local_setup.bash ] && source /opt/micro_ros_ws/install/local_setup.bash' >> /root/.bashrc && \
     echo '[ -f /ros2_ws/install/setup.bash ] && source /ros2_ws/install/setup.bash' >> /root/.bashrc
 
 WORKDIR /ros2_ws
+
 CMD ["/bin/bash"]
