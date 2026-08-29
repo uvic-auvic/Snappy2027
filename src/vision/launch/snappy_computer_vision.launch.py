@@ -15,6 +15,17 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
+    capture_target_arg = DeclareLaunchArgument(
+        "capture_target",
+        default_value="both",
+        description="Which camera(s) to record: front, bottom, or both.",
+    )
+    capture_mode_arg = DeclareLaunchArgument(
+        "capture_mode",
+        default_value="image",
+        description="Capture mode for each selected camera: image or video.",
+    )
+
     # Launch arguments for serial numbers (with defaults)
     # Serial numbers must be wrapped in single quotes for RealSense parameter type handling
     serial_no_d455_arg = DeclareLaunchArgument(
@@ -32,6 +43,8 @@ def generate_launch_description():
     # Get launch configuration
     serial_no_d455 = LaunchConfiguration("serial_no_d455")
     serial_no_d405 = LaunchConfiguration("serial_no_d405")
+    capture_target = LaunchConfiguration("capture_target")
+    capture_mode = LaunchConfiguration("capture_mode")
 
     # D455 Front Camera
     d455_launch = IncludeLaunchDescription(
@@ -98,7 +111,16 @@ def generate_launch_description():
                 executable="front_camera_vision",
                 name="front_camera_vision",
                 output="screen",
-                parameters=[{"engine_path": "/ros2_ws/models/ffc_rs_26.engine"}],
+                parameters=[{
+                    "engine_path": "/ros2_ws/models/ffc_rs_26.engine",
+                    "camera_name": "front",
+                    "capture_target": capture_target,
+                    "capture_mode": capture_mode,
+                    "video_capture_enabled": True,
+                    "image_capture_directory": "/home/snappy_data/front_camera/images",
+                    "video_capture_directory": "/home/snappy_data/front_camera/videos",
+                    "video_capture_fps": 30.0,
+                }],
             )
         ],
     )
@@ -111,19 +133,29 @@ def generate_launch_description():
                 executable="bottom_camera_vision",
                 name="bottom_camera_vision",
                 output="screen",
-                parameters=[{"engine_path": "/ros2_ws/models/dfc_rs_26.engine"}],
+                parameters=[{
+                    "engine_path": "/ros2_ws/models/dfc_rs_26.engine",
+                    "camera_name": "bottom",
+                    "capture_target": capture_target,
+                    "capture_mode": capture_mode,
+                    "video_capture_enabled": True,
+                    "image_capture_directory": "/home/snappy_data/bottom_camera/images",
+                    "video_capture_directory": "/home/snappy_data/bottom_camera/videos",
+                    "video_capture_fps": 30.0,
+                }],
             )
         ],
     )
 
     return LaunchDescription(
         [
+            capture_target_arg,
+            capture_mode_arg,
             serial_no_d455_arg,
             serial_no_d405_arg,
             d455_launch,
             d405_launch,
             front_camera_vision,
             bottom_camera_vision,
-            
         ]
     )

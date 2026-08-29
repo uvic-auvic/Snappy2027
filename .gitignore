@@ -50,3 +50,7 @@ snappy_inference/
 
 # Third-party ROS repositories populated by vcstool.
 /src/external/
+
+# Videos Saved by cameras
+snappy_data/
+models/
