@@ -10,6 +10,7 @@ services:
       - snappy_dev_build:/ros2_ws/build
       - snappy_dev_install:/ros2_ws/install
       - snappy_dev_log:/ros2_ws/log
+      - ../snappy_data:/home/snappy_data
       - /dev:/dev
     privileged: true
     network_mode: host
@@ -35,6 +36,7 @@ services:
       - snappy_jetson_build:/ros2_ws/build
       - snappy_jetson_install:/ros2_ws/install
       - snappy_jetson_log:/ros2_ws/log
+      - ../snappy_data:/home/snappy_data
       - /dev:/dev
       - /tmp/.X11-unix:/tmp/.X11-unix
       - /tmp/argus_socket:/tmp/argus_socket

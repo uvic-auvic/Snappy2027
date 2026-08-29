@@ -263,7 +263,9 @@ private:
 
     void start_video_capture(const cv::Mat &frame)
     {
-        std::filesystem::create_directories(video_capture_dir_, std::error_code{});
+       // std::filesystem::create_directories(video_capture_dir_, std::error_code{});
+        std::error_code ec;
+        std::filesystem::create_directories(video_capture_dir_, ec);
 
         const auto now = std::chrono::system_clock::now();
         const auto tt = std::chrono::system_clock::to_time_t(now);
@@ -288,13 +290,20 @@ private:
     // save bottom camera image after inference
     void save_image(const cv::Mat &image, const rclcpp::Time &timestamp)
     {
-        std::filesystem::create_directories(image_capture_dir_, std::error_code{});
-        const std::string path =
+        // std::filesystem::create_directories(image_capture_dir_, std::error_code{});
+        std::error_code ec;
+        std::filesystem::create_directories(image_capture_dir_, ec);
+
+        const std::filesystem::path path =
             std::filesystem::path(image_capture_dir_) /
             ("bottom_camera_" + std::to_string(timestamp.seconds()) + ".jpg");
+
         if (!cv::imwrite(path.string(), image)) {
-            RCLCPP_WARN(get_logger(), "save_image: failed to write %s", path.string().c_str());
-        }
+            RCLCPP_WARN(
+                get_logger(),
+                "save_image: failed to write %s",
+                path.string().c_str());
+}
     }
 
     // ---- Core inference pipeline -------------------------------------------
@@ -784,6 +793,7 @@ private:
     int mask_h_ = 0, mask_w_ = 0;
 
     // Video capture
+    bool video_capture_enabled_ = true;
     std::string image_capture_dir_ = "/home/snappy_data/bottom_camera/images";
     std::string video_capture_dir_ = "/home/snappy_data/bottom_camera/videos";
     double video_capture_fps_ = 30.0;
