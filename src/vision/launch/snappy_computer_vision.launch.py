@@ -22,7 +22,7 @@ def generate_launch_description():
     )
     capture_mode_arg = DeclareLaunchArgument(
         "capture_mode",
-        default_value="video",
+        default_value="image",
         description="Capture mode for each selected camera: image or video.",
     )
 
