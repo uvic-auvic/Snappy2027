@@ -173,8 +173,8 @@ def generate_launch_description():
             pressure_sensor_node,
             dvl,
             state_estimator_node,
-            controller_node,
-            planner_node,
+         #   controller_node,
+            # planner_node,
   #          solenoid_channel_node,
         ]
     )
