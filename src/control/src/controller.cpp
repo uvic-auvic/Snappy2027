@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cmath>
 #include <optional>
+#include <stdexcept>
 #include <std_msgs/msg/float32_multi_array.hpp>
 #include <chrono>
 #include <functional>
@@ -48,6 +49,7 @@ class Controller : public rclcpp::Node {
              declare_parameter("target_roll", 0.0);
              declare_parameter("target_pitch", 0.0);
              declare_parameter("target_yaw", 0.0);
+             declare_parameter("kill_timeout_s", 120.0);
              // 1. Declare the PID parameters with fallback defaults
              declare_parameter("pid_x", std::vector<double>{0.0, 0.0, 0.0});
              declare_parameter("pid_y", std::vector<double>{0.0, 0.0, 0.0});
@@ -108,6 +110,18 @@ class Controller : public rclcpp::Node {
             motor_publisher_ = create_publisher<snappy_interfaces::msg::ThrusterCommand>(
                 "/motor_cmd", rclcpp::QoS(10).best_effort());
 
+            const double kill_timeout_s = get_parameter("kill_timeout_s").as_double();
+            if (kill_timeout_s <= 0.0) {
+                throw std::invalid_argument("kill_timeout_s must be greater than zero");
+            }
+            kill_deadline_ = std::chrono::steady_clock::now()
+                + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                    std::chrono::duration<double>(kill_timeout_s));
+            RCLCPP_WARN(
+                get_logger(),
+                "Thruster kill timer armed: all thrusters will stop in %.1f seconds",
+                kill_timeout_s);
+
             // Publish state status to planner
             status_publisher_ = this->create_publisher<std_msgs::msg::String>("/controller/status", 10);
 
@@ -158,7 +172,26 @@ class Controller : public rclcpp::Node {
         }
 
     private:
+        void publish_zero_thrust() {
+            snappy_interfaces::msg::ThrusterCommand msg{};
+            msg.header.stamp = now();
+            msg.thruster_mask = 255;
+            msg.thrust_pct.fill(0);
+            motor_publisher_->publish(msg);
+        }
+
         void timer_callback() {
+            if (kill_latched_ || std::chrono::steady_clock::now() >= kill_deadline_) {
+                if (!kill_latched_) {
+                    kill_latched_ = true;
+                    RCLCPP_ERROR(
+                        get_logger(),
+                        "Thruster kill timer expired; all motor commands are now latched at zero");
+                }
+                publish_zero_thrust();
+                return;
+            }
+
             std::pair<Eigen::Vector3d, Eigen::Quaterniond> trajectory = generate_trajectory();
 
             // Ack the current task once its tracking error (position error
@@ -543,6 +576,8 @@ class Controller : public rclcpp::Node {
 
         rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_;
         rclcpp::TimerBase::SharedPtr timer_;
+        std::chrono::steady_clock::time_point kill_deadline_;
+        bool kill_latched_ = false;
 
         int flag_;
 
