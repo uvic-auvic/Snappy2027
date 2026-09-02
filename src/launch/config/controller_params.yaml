@@ -1,3 +1,4 @@
+# uses radians for pitch, roll, and yaw
 controller:
   ros__parameters:
     target_position: [0.0, 0.0, 2.0]
