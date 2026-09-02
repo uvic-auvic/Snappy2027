@@ -38,7 +38,7 @@ class TimeBasedController : public rclcpp::Node {
     declare_parameter("default_speed", 35.0);
     declare_parameter("state_topic", std::string("/state_estimator/state"));
     declare_parameter("command_rate_hz", 20.0);
-    declare_parameter("kill_timeout_s", 120.0);
+    declare_parameter("kill_timeout_s", 30.0);
 
     default_speed_ = get_parameter("default_speed").as_double();
     state_topic_ = get_parameter("state_topic").as_string();
