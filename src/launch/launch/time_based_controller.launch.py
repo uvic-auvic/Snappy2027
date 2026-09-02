@@ -79,7 +79,6 @@ def generate_launch_description():
         "config",
         "time_based_mission.yaml",
     )
-
     time_based_controller = Node(
         package="snappy_control",
         executable="time_based_controller",

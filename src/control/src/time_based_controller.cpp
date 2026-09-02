@@ -3,6 +3,7 @@
 #include <cmath>
 #include <fstream>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -16,6 +17,7 @@
 #include "snappy_interfaces/msg/pose.hpp"
 #include "snappy_interfaces/msg/thruster_command.hpp"
 
+#include "pid.hpp"
 #include "thruster_allocator.hpp"
 
 using namespace std::chrono_literals;
@@ -34,6 +36,7 @@ class TimeBasedController : public rclcpp::Node {
  public:
   TimeBasedController()
       : Node("time_based_controller"),
+        depth_pid_(0.0f, 0.0f, 0.0f),
         thruster_allocator_(build_thruster_configuration(), -4.0, 5.0) {
     declare_parameter("mission_file", std::string(""));
     declare_parameter("mission_timeout_sec", 120.0);
@@ -42,7 +45,6 @@ class TimeBasedController : public rclcpp::Node {
     declare_parameter("kill_topic", std::string("/mower_board_status"));
     declare_parameter("bool_kill_topics", std::vector<std::string>{"/kill_cmd", "/kill_switch"});
     declare_parameter("command_rate_hz", 20.0);
-    declare_parameter("max_depth_error", 0.25);
 
     mission_timeout_sec_ = get_parameter("mission_timeout_sec").as_double();
     default_speed_ = get_parameter("default_speed").as_double();
@@ -120,6 +122,14 @@ class TimeBasedController : public rclcpp::Node {
       return;
     }
 
+    const YAML::Node depth_pid = root["depth_pid"];
+    if (!depth_pid || !depth_pid.IsSequence() || depth_pid.size() != 3) {
+      throw std::runtime_error(
+          "Mission file 'depth_pid' must contain exactly [Kp, Ki, Kd]");
+    }
+    depth_pid_ = PID(
+        depth_pid[0].as<float>(), depth_pid[1].as<float>(), depth_pid[2].as<float>());
+
     for (std::size_t i = 0; i < steps.size(); ++i) {
       const YAML::Node step_node = steps[i];
       MissionStep step;
@@ -192,7 +202,7 @@ class TimeBasedController : public rclcpp::Node {
           }
           const double hold_elapsed = (now - depth_hold_started_).seconds();
           depth_hold_elapsed_ = hold_elapsed;
-          publish_wrench(build_depth_hold_wrench(step.target_depth), "holding depth at target");
+          publish_wrench(build_depth_hold_wrench(), "holding depth at target");
           if (hold_elapsed >= step.hold_time) {
             complete_current_step();
           }
@@ -208,7 +218,7 @@ class TimeBasedController : public rclcpp::Node {
         return;
       }
 
-      publish_wrench(build_depth_target_wrench(step.target_depth, step.speed), "depth_target in progress");
+      publish_wrench(build_depth_target_wrench(step.speed), "depth_target in progress");
       return;
     }
 
@@ -234,6 +244,7 @@ class TimeBasedController : public rclcpp::Node {
     depth_hold_started_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
 
     if (step.command == "depth_target") {
+      depth_pid_.set_target(static_cast<float>(step.target_depth));
       RCLCPP_INFO(get_logger(), "Starting depth target step %s: target depth %.2f m, hold %.1f s, max %.1f s", step.label.c_str(),
                   step.target_depth, step.hold_time, step.duration);
     } else {
@@ -279,24 +290,25 @@ class TimeBasedController : public rclcpp::Node {
     return wrench;
   }
 
-  Eigen::VectorXd build_depth_target_wrench(double target_depth, double speed) const {
+  Eigen::VectorXd build_depth_target_wrench(double speed) {
     Eigen::VectorXd wrench(6);
     wrench.setZero();
 
-    const double error = target_depth - current_depth_;
-    const double vertical_command = std::clamp((error * 3.0), -speed, speed);
-    const double body_force = std::clamp(std::abs(vertical_command) / 20.0, 0.0, 5.0);
-    wrench[2] = std::copysign(body_force, vertical_command);
+    const double correction_limit = std::clamp(std::abs(speed) / 20.0, 0.0, 5.0);
+    const double depth_correction = std::clamp(
+        static_cast<double>(depth_pid_.update(static_cast<float>(current_depth_))),
+        -correction_limit, correction_limit);
+    wrench[2] = depth_correction + 5.0;
     return wrench;
   }
 
-  Eigen::VectorXd build_depth_hold_wrench(double target_depth) const {
+  Eigen::VectorXd build_depth_hold_wrench() {
     Eigen::VectorXd wrench(6);
     wrench.setZero();
-    const double error = target_depth - current_depth_;
-    const double vertical_command = std::clamp(error * 4.0, -30.0, 30.0);
-    const double body_force = std::clamp(std::abs(vertical_command) / 20.0, 0.0, 5.0);
-    wrench[2] = std::copysign(body_force, vertical_command);
+    const double depth_correction = std::clamp(
+        static_cast<double>(depth_pid_.update(static_cast<float>(current_depth_))),
+        -1.5, 1.5);
+    wrench[2] = depth_correction + 5.0;
     return wrench;
   }
 
@@ -406,6 +418,7 @@ class TimeBasedController : public rclcpp::Node {
   double depth_hold_elapsed_ = 0.0;
   snappy_interfaces::msg::Pose current_position_;
 
+  PID depth_pid_;
   ThrusterAllocator thruster_allocator_;
 };
 

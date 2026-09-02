@@ -1,3 +1,5 @@
+depth_pid: [0.72, 0.08, 0.76]  # [Kp, Ki, Kd]
+
 movement_sequence:
   - command: depth_target
     duration: 30.0
