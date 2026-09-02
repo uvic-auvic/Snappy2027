@@ -11,13 +11,10 @@
 #include <yaml-cpp/yaml.h>
 
 #include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/string.hpp"
-#include "snappy_interfaces/msg/mower_board_status.hpp"
 #include "snappy_interfaces/msg/pose.hpp"
 #include "snappy_interfaces/msg/thruster_command.hpp"
 
-#include "pid.hpp"
 #include "thruster_allocator.hpp"
 
 using namespace std::chrono_literals;
@@ -36,46 +33,38 @@ class TimeBasedController : public rclcpp::Node {
  public:
   TimeBasedController()
       : Node("time_based_controller"),
-        depth_pid_(0.0f, 0.0f, 0.0f),
         thruster_allocator_(build_thruster_configuration(), -4.0, 5.0) {
     declare_parameter("mission_file", std::string(""));
-    declare_parameter("mission_timeout_sec", 120.0);
     declare_parameter("default_speed", 35.0);
     declare_parameter("state_topic", std::string("/state_estimator/state"));
-    declare_parameter("kill_topic", std::string("/mower_board_status"));
-    declare_parameter("bool_kill_topics", std::vector<std::string>{"/kill_cmd", "/kill_switch"});
     declare_parameter("command_rate_hz", 20.0);
+    declare_parameter("kill_timeout_s", 120.0);
 
-    mission_timeout_sec_ = get_parameter("mission_timeout_sec").as_double();
     default_speed_ = get_parameter("default_speed").as_double();
     state_topic_ = get_parameter("state_topic").as_string();
-    kill_topic_ = get_parameter("kill_topic").as_string();
     command_rate_hz_ = get_parameter("command_rate_hz").as_double();
 
     motor_publisher_ = create_publisher<snappy_interfaces::msg::ThrusterCommand>(
         "/motor_cmd", rclcpp::QoS(10).best_effort());
+
+    const double kill_timeout_s = get_parameter("kill_timeout_s").as_double();
+    if (kill_timeout_s <= 0.0) {
+      throw std::invalid_argument("kill_timeout_s must be greater than zero");
+    }
+    kill_deadline_ = std::chrono::steady_clock::now()
+      + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+        std::chrono::duration<double>(kill_timeout_s));
+    RCLCPP_WARN(
+      get_logger(),
+      "Thruster kill timer armed: all thrusters will stop in %.1f seconds",
+      kill_timeout_s);
+
     status_publisher_ = create_publisher<std_msgs::msg::String>(
         "/time_based_controller/status", 10);
 
     state_subscription_ = create_subscription<snappy_interfaces::msg::Pose>(
         state_topic_, 10,
         std::bind(&TimeBasedController::state_callback, this, std::placeholders::_1));
-
-    kill_subscription_ = create_subscription<snappy_interfaces::msg::MowerBoardStatus>(
-        kill_topic_, 10,
-        std::bind(&TimeBasedController::kill_status_callback, this, std::placeholders::_1));
-
-    const auto bool_kill_topics =
-        get_parameter("bool_kill_topics").as_string_array();
-    for (const auto & topic : bool_kill_topics) {
-      bool_kill_subscriptions_.push_back(create_subscription<std_msgs::msg::Bool>(
-          topic, 10,
-          [this](const std_msgs::msg::Bool::SharedPtr msg) {
-            if (msg && msg->data) {
-              trigger_stop("kill command");
-            }
-          }));
-    }
 
     timer_ = create_wall_timer(std::chrono::duration<double>(1.0 / command_rate_hz_),
                                std::bind(&TimeBasedController::timer_callback, this));
@@ -90,9 +79,6 @@ class TimeBasedController : public rclcpp::Node {
     }
 
     publish_status("Mission starting");
-    mission_start_time_ = this->now();
-    mission_deadline_ = mission_start_time_ + rclcpp::Duration::from_seconds(mission_timeout_sec_);
-    RCLCPP_INFO(get_logger(), "Mission timeout set to %.1f s", mission_timeout_sec_);
   }
 
  private:
@@ -122,14 +108,6 @@ class TimeBasedController : public rclcpp::Node {
       return;
     }
 
-    const YAML::Node depth_pid = root["depth_pid"];
-    if (!depth_pid || !depth_pid.IsSequence() || depth_pid.size() != 3) {
-      throw std::runtime_error(
-          "Mission file 'depth_pid' must contain exactly [Kp, Ki, Kd]");
-    }
-    depth_pid_ = PID(
-        depth_pid[0].as<float>(), depth_pid[1].as<float>(), depth_pid[2].as<float>());
-
     for (std::size_t i = 0; i < steps.size(); ++i) {
       const YAML::Node step_node = steps[i];
       MissionStep step;
@@ -155,27 +133,22 @@ class TimeBasedController : public rclcpp::Node {
                                           msg->orientation.z * msg->orientation.z));
   }
 
-  void kill_status_callback(const snappy_interfaces::msg::MowerBoardStatus::SharedPtr msg) {
-    if (msg && msg->kill_switch_engaged) {
-      trigger_stop("hardware kill switch engaged");
-    }
-  }
-
   void timer_callback() {
     const rclcpp::Time now = this->now();
 
-    if (!mission_active_) {
+    if (kill_latched_ || std::chrono::steady_clock::now() >= kill_deadline_) {
+      if (!kill_latched_) {
+        kill_latched_ = true;
+        RCLCPP_ERROR(
+            get_logger(),
+            "Thruster kill timer expired; all motor commands are now latched at zero");
+      }
       publish_zero_thrust();
       return;
     }
 
-    if (now >= mission_deadline_) {
-      trigger_stop("global safety timeout reached");
-      return;
-    }
-
-    if (kill_engaged_) {
-      trigger_stop("kill condition active");
+    if (!mission_active_) {
+      publish_zero_thrust();
       return;
     }
 
@@ -202,7 +175,7 @@ class TimeBasedController : public rclcpp::Node {
           }
           const double hold_elapsed = (now - depth_hold_started_).seconds();
           depth_hold_elapsed_ = hold_elapsed;
-          publish_wrench(build_depth_hold_wrench(), "holding depth at target");
+          publish_wrench(build_depth_hold_wrench(step.target_depth), "holding depth at target");
           if (hold_elapsed >= step.hold_time) {
             complete_current_step();
           }
@@ -218,7 +191,7 @@ class TimeBasedController : public rclcpp::Node {
         return;
       }
 
-      publish_wrench(build_depth_target_wrench(step.speed), "depth_target in progress");
+      publish_wrench(build_depth_target_wrench(step.target_depth, step.speed), "depth_target in progress");
       return;
     }
 
@@ -244,7 +217,6 @@ class TimeBasedController : public rclcpp::Node {
     depth_hold_started_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
 
     if (step.command == "depth_target") {
-      depth_pid_.set_target(static_cast<float>(step.target_depth));
       RCLCPP_INFO(get_logger(), "Starting depth target step %s: target depth %.2f m, hold %.1f s, max %.1f s", step.label.c_str(),
                   step.target_depth, step.hold_time, step.duration);
     } else {
@@ -290,30 +262,29 @@ class TimeBasedController : public rclcpp::Node {
     return wrench;
   }
 
-  Eigen::VectorXd build_depth_target_wrench(double speed) {
+  Eigen::VectorXd build_depth_target_wrench(double target_depth, double speed) const {
     Eigen::VectorXd wrench(6);
     wrench.setZero();
 
-    const double correction_limit = std::clamp(std::abs(speed) / 20.0, 0.0, 5.0);
-    const double depth_correction = std::clamp(
-        static_cast<double>(depth_pid_.update(static_cast<float>(current_depth_))),
-        -correction_limit, correction_limit);
-    wrench[2] = depth_correction + 5.0;
+    const double error = target_depth - current_depth_;
+    const double vertical_command = std::clamp((error * 3.0), -speed, speed);
+    const double body_force = std::clamp(std::abs(vertical_command) / 20.0, 0.0, 5.0);
+    wrench[2] = std::copysign(body_force, vertical_command);
     return wrench;
   }
 
-  Eigen::VectorXd build_depth_hold_wrench() {
+  Eigen::VectorXd build_depth_hold_wrench(double target_depth) const {
     Eigen::VectorXd wrench(6);
     wrench.setZero();
-    const double depth_correction = std::clamp(
-        static_cast<double>(depth_pid_.update(static_cast<float>(current_depth_))),
-        -1.5, 1.5);
-    wrench[2] = depth_correction + 5.0;
+    const double error = target_depth - current_depth_;
+    const double vertical_command = std::clamp(error * 4.0, -30.0, 30.0);
+    const double body_force = std::clamp(std::abs(vertical_command) / 20.0, 0.0, 5.0);
+    wrench[2] = std::copysign(body_force, vertical_command);
     return wrench;
   }
 
   void publish_wrench(const Eigen::VectorXd & wrench, const std::string & reason) {
-    if (kill_engaged_ || !mission_active_) {
+    if (!mission_active_) {
       publish_zero_thrust();
       return;
     }
@@ -332,6 +303,7 @@ class TimeBasedController : public rclcpp::Node {
 
   void publish_zero_thrust() {
     snappy_interfaces::msg::ThrusterCommand msg;
+    msg.header.stamp = now();
     msg.thruster_mask = 255;
     for (auto & value : msg.thrust_pct) {
       value = 0;
@@ -357,19 +329,6 @@ class TimeBasedController : public rclcpp::Node {
     return static_cast<int8_t>(std::clamp(thrust * 25.0, -100.0, 100.0));
   }
 
-  void trigger_stop(const std::string & reason) {
-    if (!mission_active_) {
-      publish_zero_thrust();
-      return;
-    }
-
-    mission_active_ = false;
-    kill_engaged_ = true;
-    publish_zero_thrust();
-    RCLCPP_WARN(get_logger(), "Stopping mission: %s", reason.c_str());
-    publish_status("STOP: " + reason);
-  }
-
   void finish_mission(const std::string & reason) {
     mission_active_ = false;
     publish_zero_thrust();
@@ -386,7 +345,6 @@ class TimeBasedController : public rclcpp::Node {
  public:
   void stop_all_motion_on_shutdown() {
     mission_active_ = false;
-    kill_engaged_ = true;
     publish_zero_thrust();
   }
 
@@ -394,31 +352,25 @@ class TimeBasedController : public rclcpp::Node {
   rclcpp::Publisher<snappy_interfaces::msg::ThrusterCommand>::SharedPtr motor_publisher_;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr status_publisher_;
   rclcpp::Subscription<snappy_interfaces::msg::Pose>::SharedPtr state_subscription_;
-  rclcpp::Subscription<snappy_interfaces::msg::MowerBoardStatus>::SharedPtr kill_subscription_;
-  std::vector<rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr> bool_kill_subscriptions_;
   rclcpp::TimerBase::SharedPtr timer_;
 
   std::vector<MissionStep> mission_steps_;
   std::size_t mission_step_index_ = 0;
   bool step_started_ = false;
   bool mission_active_ = true;
-  bool kill_engaged_ = false;
-  double mission_timeout_sec_ = 120.0;
   double default_speed_ = 35.0;
   double command_rate_hz_ = 20.0;
   std::string state_topic_;
-  std::string kill_topic_;
 
-  rclcpp::Time mission_start_time_;
-  rclcpp::Time mission_deadline_;
   rclcpp::Time step_started_at_;
   rclcpp::Time depth_hold_started_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
+  std::chrono::steady_clock::time_point kill_deadline_;
+  bool kill_latched_ = false;
   double current_depth_ = 0.0;
   double current_yaw_ = 0.0;
   double depth_hold_elapsed_ = 0.0;
   snappy_interfaces::msg::Pose current_position_;
 
-  PID depth_pid_;
   ThrusterAllocator thruster_allocator_;
 };
 

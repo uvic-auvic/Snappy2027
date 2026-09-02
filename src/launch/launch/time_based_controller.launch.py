@@ -79,6 +79,7 @@ def generate_launch_description():
         "config",
         "time_based_mission.yaml",
     )
+
     time_based_controller = Node(
         package="snappy_control",
         executable="time_based_controller",
@@ -87,12 +88,10 @@ def generate_launch_description():
         parameters=[
             {
                 "mission_file": str(mission_file),
-                "mission_timeout_sec": 120.0,
                 "default_speed": 35.0,
                 "state_topic": "/state_estimator/state",
-                "kill_topic": "/mower_board_status",
-                "bool_kill_topics": ["/kill_cmd", "/kill_switch"],
                 "command_rate_hz": 20.0,
+                "kill_timeout_s": 120.0,
             }
         ],
     )
@@ -104,7 +103,7 @@ def generate_launch_description():
             "mkdir -p /tmp/snappy_rosbags && ros2 bag record -o /tmp/snappy_rosbags/time_based_$(date +%Y%m%d_%H%M%S) "
             "/state_estimator/state /depth_data /imu/data /d455/camera/camera/imu "
             "/waterlinked_dvl_driver/odom /motor_cmd /controller/status /time_based_controller/status "
-            "/planner/task /controller/task_done /mower_board_status /kill_cmd /kill_switch",
+            "/planner/task /controller/task_done",
         ],
         output="screen",
     )
