@@ -533,10 +533,15 @@ class Controller : public rclcpp::Node {
         }
 
         void state_callback(const snappy_interfaces::msg::Pose & msg) {
-            current_position = Eigen::Vector3d(
+           /* current_position = Eigen::Vector3d(
                  msg.position.x,
                  msg.position.y,
                  msg.position.z);
+            */ 
+           
+            current_position.x() = target_position.x();
+            current_position.y() = target_position.y();
+            current_position.z() = msg.position.z;    
 
             current_orientation = Eigen::Quaterniond(
                 msg.orientation.w,
