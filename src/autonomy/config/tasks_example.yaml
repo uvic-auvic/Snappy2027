@@ -1,6 +1,14 @@
 # Task list for the planner node (pass via the task_file param).
 # Angles are in degrees; z is carried for schema consistency but the
 # controller's target depth is pinned by controller_params.yaml.
+
+# The pitch, roll and yaw values are degrees, but the controller expects radians. The planner node will convert these values to 
+# radians before sending them to the controller.
 tasks:
-  - {x: 0.0, y: 0.0, z: 1.0, pitch: 0.0, roll: 0.0, yaw: 0.0} # Gate
-  - {x: 1.0, y: 0.0, z: 0.0, pitch: 0.0, roll: 0.0, yaw: 0.0} # Gate
+  #- {x: 0.0, y: 0.0, z: 1.0, pitch: 0.0, roll: 0.0, yaw: 0.0} # Gate
+  #- {x: 1.0, y: 0.0, z: 0.0, pitch: 0.0, roll: 0.0, yaw: 0.0} # Gate
+  #- {x: 0.0, y: 0.0, z: 0.5, pitch: 0.0, roll: 0.0, yaw: 45.0} # Yaw test
+  - {x: 0.0, y: 0.0, z: 1.0, pitch: 45.0, roll: 0.0, yaw: 0.0} # Pitch test 1
+  - {x: 0.0, y: 0.0, z: 1.0, pitch: -45.0, roll: 0.0, yaw: 0.0} # Pitch test 2
+  - {x: 0.0, y: 0.0, z: 1.0, pitch: 0.0, roll: 90.0, yaw: 0.0} # Roll test 1
+  - {x: 0.0, y: 0.0, z: 1.0, pitch: 0.0, roll: -90.0, yaw: 0.0} # Roll test 2
