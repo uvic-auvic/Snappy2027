@@ -49,7 +49,7 @@ class Controller : public rclcpp::Node {
              declare_parameter("target_roll", 0.0);
              declare_parameter("target_pitch", 0.0);
              declare_parameter("target_yaw", 0.0);
-             declare_parameter("kill_timeout_s", 120.0);
+             declare_parameter("kill_timeout_s", 30.0);
              // 1. Declare the PID parameters with fallback defaults
              declare_parameter("pid_x", std::vector<double>{0.0, 0.0, 0.0});
              declare_parameter("pid_y", std::vector<double>{0.0, 0.0, 0.0});
