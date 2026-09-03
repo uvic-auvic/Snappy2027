@@ -1,6 +1,7 @@
 depth_pid: [0.72, 0.08, 0.76]  # [Kp, Ki, Kd]
 
 movement_sequence:
+# Test 4
   - command: depth_target
     duration: 30.0
     target_depth: 3.0
@@ -38,3 +39,36 @@ movement_sequence:
     duration: 0.0
     speed: 0.0
     label: end_mission
+# Test 6
+  # - command: depth_target
+  #   duration: 30.0
+  #   target_depth: 1.0
+  #   hold_time: 5.0
+  #   tolerance: 0.25
+  #   speed: 30.0
+  #   label: descend_to_3m
+
+  # - command: stop
+  #   duration: 5.0
+  #   speed: 0.0
+  #   label: hold_stop
+
+  # - command: forward
+  #   duration: 5.0
+  #   speed: 35.0
+  #   label: forward_5s
+
+  # - command: backward
+  #   duration: 5.0
+  #   speed: 35.0
+  #   label: backward_5s
+
+  # - command: left
+  #   duration: 5.0
+  #   speed: 35.0
+  #   label: left_5s
+
+  # - command: right
+  #   duration: 5.0
+  #   speed: 35.0
+  #   label: right_5s
