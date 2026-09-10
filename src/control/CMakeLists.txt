@@ -64,4 +64,14 @@ install(
 ament_export_targets(export_control_algorithms HAS_LIBRARY_TARGET)
 ament_export_dependencies(Eigen3)
 
+if(BUILD_TESTING)
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  enable_testing()
+  add_executable(test_control_algorithms test/test_control_algorithms.cpp)
+  target_link_libraries(test_control_algorithms control_algorithms)
+  add_test(NAME control_algorithms_regression COMMAND test_control_algorithms)
+  add_test(NAME control_ros_integration COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/test_ros_control.py)
+  set_tests_properties(control_ros_integration PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE)
+endif()
+
 ament_package()

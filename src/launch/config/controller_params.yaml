@@ -6,6 +6,16 @@ controller:
     target_pitch: 0.0
     target_yaw: 0.0
     kill_timeout_s: 120.0
+    # No DVL: no X/Y position commands or fabricated position feedback.
+    enable_xy_control: false
+    state_timeout_s: 0.5
+    task_timeout_s: 60.0
+    position_tolerance_m: 0.1
+    orientation_tolerance_rad: 0.0872664626  # 5 degrees
+    settle_time_s: 0.5
+    settle_speed_m_s: 0.1
+    settle_rate_rad_s: 0.1745329252  # 10 degrees/second
+    heave_feedforward: 5.0
 
     pid_x: [2.0, 0.04, 0.0]
     pid_y: [1.0, 0.04, 0.0]

@@ -1,9 +1,8 @@
 // Depth sensor node. Reads newline-delimited "D <metres>" lines from an Arduino
 // (Bar02 pressure sensor) over a USB serial port and republishes the latest
 // reading as a Float32 on depth_data, which the controller and planner consume.
-// The serial port is opened in canonical, blocking mode so each read() returns
-// one complete line; the timer drains the buffer and keeps only the freshest
-// sample.
+// Canonical, nonblocking reads return complete lines when available. Each timer
+// callback drains a bounded amount of buffered input and uses the newest sample.
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/float32.hpp>
 #include <fcntl.h>
@@ -14,34 +13,34 @@
 #include <cerrno>
 #include <cstring>
 #include <vector>
+#include <cmath>
+#include <limits>
 
 class DepthSensorNode : public rclcpp::Node
 {
 public:
-    // Open and configure /dev/ttyUSB0 (115200 8N1, canonical) and start the
-    // 10 Hz read timer. If the port can't be opened the node stays up but idle.
+    // Open the configured port at 115200 8N1 and start the 10 Hz read timer.
     DepthSensorNode() : Node("depth_sensor_node"), serial_fd_(-1)
     {
+        const std::string serial_port = declare_parameter("serial_port", std::string("/dev/ttyUSB0"));
         // Publishes a plain float — your state estimator reads this directly
         publisher_ = this->create_publisher<std_msgs::msg::Float32>("depth_data", 10);
 
-        // FIX (bugs 1 & 4): Open WITHOUT O_NONBLOCK. Canonical mode needs blocking
-        // reads so that read() waits for a full \n-terminated line rather than
-        // returning EAGAIN immediately on a partially-arrived line.
-        serial_fd_ = open("/dev/ttyUSB0", O_RDONLY | O_NOCTTY);
+        // Avoid blocking during open on modem control lines. Canonical mode
+        // buffers incomplete lines; EAGAIN simply means no full line is ready.
+        serial_fd_ = open(serial_port.c_str(), O_RDONLY | O_NOCTTY | O_NONBLOCK);
         if (serial_fd_ < 0) {
-            //RCLCPP_ERROR(this->get_logger(), "Failed to open /dev/ttyUSB0");
-            return;
+            throw std::runtime_error("Failed to open depth port " + serial_port + ": " + strerror(errno));
         }
 
         // FIX (bug 3): Zero-initialise tty and check tcgetattr return value so we
         // never pass a garbage struct to tcsetattr if the fd is not a real tty.
         struct termios tty{};
         if (tcgetattr(serial_fd_, &tty) < 0) {
-            //RCLCPP_ERROR(this->get_logger(), "tcgetattr failed: %s", strerror(errno));
+            RCLCPP_ERROR(this->get_logger(), "tcgetattr failed: %s", strerror(errno));
             close(serial_fd_);
             serial_fd_ = -1;
-            return;
+            throw std::runtime_error("Depth serial configuration failed");
         }
 
         // Arduino sketch uses 115200 baud — must match
@@ -58,6 +57,7 @@ public:
         // this ensures 8 data bits
         tty.c_cflag &= ~CSIZE;
         tty.c_cflag |= CS8;
+        tty.c_cflag &= ~CRTSCTS;
 
         // Canonical mode: read() returns one complete line at a time (\n terminated)
         // This prevents partial reads and is exactly how the Python node works —
@@ -68,10 +68,9 @@ public:
         tty.c_lflag &= ~(ECHO | ECHOE | ECHOK | ECHONL | ISIG);
 
         // disable the software flow control (XON/XOFF) and other special characters
-        // FIX (bug 7): Also clear ICRNL so that \r from Arduino Serial.println()
-        // \r\n endings is stripped by the kernel before the line is delivered,
-        // preventing stray \r bytes from confusing prefix matching and parse logic.
+        // IGNCR strips Arduino CRLF's carriage return; LF terminates the line.
         tty.c_iflag &= ~(IXON | IXOFF | IXANY | ICRNL);
+        tty.c_iflag |= IGNCR;
 
         // output processing
         // raw output — no \n → \r\n translation on send
@@ -79,33 +78,26 @@ public:
 
         // FIX (bug 3): Check tcsetattr return value.
         if (tcsetattr(serial_fd_, TCSANOW, &tty) < 0) {
-            //RCLCPP_ERROR(this->get_logger(), "tcsetattr failed: %s", strerror(errno));
+            RCLCPP_ERROR(this->get_logger(), "tcsetattr failed: %s", strerror(errno));
             close(serial_fd_);
             serial_fd_ = -1;
-            return;
+            throw std::runtime_error("Depth serial configuration failed");
         }
 
-        // FIX (bugs 1 & 4): O_NONBLOCK is a file-descriptor flag — tcsetattr cannot
-        // clear it. We need it set during open() on some BSDs for non-blocking
-        // modem-control negotiation, but for the drain loop we want non-blocking
-        // reads (to detect an empty kernel buffer). So we re-enable O_NONBLOCK via
-        // fcntl now that the port is fully configured and canonical mode is active.
-        // This is distinct from the original bug: canonical mode + O_NONBLOCK is
-        // only safe once the port is configured; the original code opened with
-        // O_NONBLOCK and never verified termios was applied correctly first.
+        // Verify nonblocking reads remain enabled after terminal configuration.
         int flags = fcntl(serial_fd_, F_GETFL, 0);
         if (flags < 0 || fcntl(serial_fd_, F_SETFL, flags | O_NONBLOCK) < 0) {
-            //RCLCPP_ERROR(this->get_logger(), "fcntl F_SETFL failed: %s", strerror(errno));
+            RCLCPP_ERROR(this->get_logger(), "fcntl F_SETFL failed: %s", strerror(errno));
             close(serial_fd_);
             serial_fd_ = -1;
-            return;
+            throw std::runtime_error("Depth serial configuration failed");
         }
 
         timer_ = this->create_wall_timer(
             std::chrono::milliseconds(100),
             std::bind(&DepthSensorNode::read_and_publish, this));
 
-        //RCLCPP_INFO(this->get_logger(), "Depth sensor node started on /dev/ttyUSB0 at 115200 baud");
+        RCLCPP_INFO(this->get_logger(), "Depth sensor on %s at 115200 baud", serial_port.c_str());
     }
 
     // Close the serial port if it was opened.
@@ -142,8 +134,10 @@ private:
         std::string num_str = trimmed.substr(prefix.size());
 
         try {
-            depth_out = std::stod(num_str);
-            return true;
+            size_t consumed = 0;
+            depth_out = std::stod(num_str, &consumed);
+            return consumed == num_str.size() && std::isfinite(depth_out) &&
+                std::abs(depth_out) <= std::numeric_limits<float>::max();
         } catch (...) {
             return false;
         }
@@ -164,7 +158,8 @@ private:
         std::vector<std::string> lines;
         char buffer[256];
 
-        while (true) {
+        // Bound work per callback even when a device continuously streams data.
+        for (int reads = 0; reads < 64; ++reads) {
             int bytes_read = read(serial_fd_, buffer, sizeof(buffer) - 1);
             if (bytes_read > 0) {
                 buffer[bytes_read] = '\0';
@@ -183,7 +178,7 @@ private:
             }
             if (bytes_read < 0) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) break;  // buffer empty
-                //RCLCPP_ERROR(this->get_logger(), "Error reading from serial: %s", strerror(errno));
+                RCLCPP_ERROR_THROTTLE(get_logger(), *get_clock(), 2000, "Serial read failed: %s", strerror(errno));
                 return;
             }
             break;  // bytes_read == 0, EOF
@@ -212,8 +207,13 @@ private:
 int main(int argc, char ** argv)
 {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<DepthSensorNode>();
-    rclcpp::spin(node);
+    try {
+        rclcpp::spin(std::make_shared<DepthSensorNode>());
+    } catch (const std::exception& error) {
+        RCLCPP_FATAL(rclcpp::get_logger("depth_sensor_node"), "%s", error.what());
+        rclcpp::shutdown();
+        return 1;
+    }
     rclcpp::shutdown();
     return 0;
 }

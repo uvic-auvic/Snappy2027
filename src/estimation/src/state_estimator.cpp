@@ -6,6 +6,7 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <optional>
 
 #include "snappy_interfaces/msg/pose.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -48,6 +49,9 @@ public:
 
     StateEstimator() : Node("state_estimator")
     {
+        sensor_timeout_s_ = declare_parameter("sensor_timeout_s", 1.0);
+        if (!std::isfinite(sensor_timeout_s_) || sensor_timeout_s_ <= 0)
+            throw std::invalid_argument("sensor_timeout_s must be finite and positive");
         //RCLCPP_INFO(this->get_logger(), "State Estimator starting...");
 
         // imu1_file: accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z
@@ -148,6 +152,9 @@ public:
 private:
     void imu1_callback(const sensor_msgs::msg::Imu::SharedPtr msg)
     {
+        if (!std::isfinite(msg->linear_acceleration.x) || !std::isfinite(msg->linear_acceleration.y) ||
+            !std::isfinite(msg->linear_acceleration.z) || !std::isfinite(msg->angular_velocity.x) ||
+            !std::isfinite(msg->angular_velocity.y) || !std::isfinite(msg->angular_velocity.z)) return;
         if (!imu_received_) {
             //RCLCPP_INFO(this->get_logger(), "✅ First IMU1 message received!");
             imu_received_ = true;
@@ -161,7 +168,7 @@ private:
 
         const double dt = now_sec - last_time_imu1_sec_;
         last_time_imu1_sec_ = now_sec;
-        if(dt > 0.001 && frame_initialized_)
+        if(dt > 0.001 && dt <= sensor_timeout_s_ && frame_initialized_)
         {
             Vector3d accel(msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z);
             Vector3d gyro(msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z);
@@ -191,6 +198,18 @@ private:
 
     void imu2_callback(const sensor_msgs::msg::Imu::SharedPtr msg)
     {
+        const Quaterniond measured(msg->orientation.w, msg->orientation.x, msg->orientation.y, msg->orientation.z);
+        if (!measured.coeffs().allFinite() || !std::isfinite(measured.norm()) || measured.norm() < 1e-6 ||
+            msg->orientation_covariance[0] < 0 || !std::isfinite(msg->linear_acceleration.x) ||
+            !std::isfinite(msg->linear_acceleration.y) || !std::isfinite(msg->linear_acceleration.z)) {
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "Rejecting invalid IMU2 measurement");
+            return;
+        }
+        if (!last_depth_receipt_ || std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - *last_depth_receipt_).count() > sensor_timeout_s_) {
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "Depth data missing/stale; withholding estimator state");
+            return;
+        }
         //pose message
         auto pose = snappy_interfaces::msg::Pose();
 
@@ -202,6 +221,10 @@ private:
         imu2_count_++;
         const double now_sec = rclcpp::Time(msg->header.stamp).seconds();
 
+        if (imu2_initialized_ && now_sec <= last_time_imu2_sec_) {
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "Rejecting duplicate/out-of-order IMU2 timestamp");
+            return;
+        }
         if (!imu2_initialized_) {
             imu2_initialized_ = true;
             last_time_imu2_sec_ = now_sec;
@@ -220,6 +243,10 @@ private:
         
         const double dt = now_sec - last_time_imu2_sec_;
         last_time_imu2_sec_ = now_sec;
+        if (dt > sensor_timeout_s_) {
+            RCLCPP_WARN(get_logger(), "IMU2 timestamp gap %.3f s; skipping integration across gap", dt);
+            return;
+        }
 
         if (!frame_initialized_) {
             //RCLCPP_INFO(this->get_logger(), "Waiting for frame initialization...");
@@ -284,6 +311,11 @@ private:
 
    void depth_callback(const std_msgs::msg::Float32 & msg)
     {
+        if (!std::isfinite(msg.data)) {
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "Rejecting non-finite depth");
+            return;
+        }
+        last_depth_receipt_ = std::chrono::steady_clock::now();
         float depth_data = msg.data;
         //RCLCPP_INFO(this->get_logger(), "Depth data received: %f", depth_data);
 
@@ -428,6 +460,8 @@ private:
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub1_;
+    double sensor_timeout_s_ = 1.0;
+    std::optional<std::chrono::steady_clock::time_point> last_depth_receipt_;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub2_;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr depth_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr dvl_subscription_;

@@ -8,6 +8,7 @@ Usage:
 """
 
 from pathlib import Path
+import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -16,12 +17,24 @@ from launch.actions import (
     ExecuteProcess,
     IncludeLaunchDescription,
     TimerAction,
+    OpaqueFunction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import PythonExpression
+from launch.conditions import IfCondition
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
+
+
+def validate_serial_ports(context):
+    assignments = {name: os.path.realpath(LaunchConfiguration(name).perform(context))
+                   for name in ("serial_dev", "imu_port", "depth_port")}
+    if len(set(assignments.values())) != len(assignments):
+        raise RuntimeError(f"Motor board, IMU, and depth sensor must use different serial devices: {assignments}")
+    return []
 
 
 def generate_launch_description():
@@ -52,6 +65,7 @@ def generate_launch_description():
                 )
             ]
         ),
+        condition=IfCondition(LaunchConfiguration("enable_dvl")),
     )
 
     serial_dev_arg = DeclareLaunchArgument(
@@ -92,7 +106,10 @@ def generate_launch_description():
         executable="xsens_mti_node",
         name="xsens_mti_node",
         output="screen",
-        parameters=[xsens_parameters_file_path],
+        parameters=[xsens_parameters_file_path, {
+            "scan_for_devices": False,
+            "port": LaunchConfiguration("imu_port"),
+        }],
         arguments=[],
     )
 
@@ -104,7 +121,13 @@ def generate_launch_description():
                 executable="controller",
                 name="controller",
                 output="screen",
-                parameters=[controller_parameters_file_path]
+                parameters=[controller_parameters_file_path, {
+                    "wait_for_task": ParameterValue(LaunchConfiguration("enable_planner"), value_type=bool),
+                }],
+                condition=IfCondition(PythonExpression([
+                    "'", LaunchConfiguration("enable_controller"), "'.lower() == 'true' or '",
+                    LaunchConfiguration("enable_planner"), "'.lower() == 'true'",
+                ])),
             )
         ],
     )
@@ -147,7 +170,8 @@ def generate_launch_description():
                 executable="planner",
                 name="planner",
                 output="screen",
-                parameters=[{"task_file": str(task_file_path)}]
+                parameters=[{"task_file": LaunchConfiguration("task_file")}],
+                condition=IfCondition(LaunchConfiguration("enable_planner")),
             )
         ],
     )
@@ -160,21 +184,29 @@ def generate_launch_description():
                 executable="pressureSensor",
                 name="pressure_sensor",
                 output="screen",
+                parameters=[{"serial_port": LaunchConfiguration("depth_port")}],
             )
         ],
     )
 
     return LaunchDescription(
         [
-            xsens_mti_node,
+            DeclareLaunchArgument("enable_controller", default_value="false", choices=["true", "false"], description="Run fixed-target control"),
+            DeclareLaunchArgument("enable_planner", default_value="false", choices=["true", "false"], description="Run mission and controller together"),
+            DeclareLaunchArgument("enable_dvl", default_value="false", choices=["true", "false"], description="Enable DVL hardware driver"),
+            DeclareLaunchArgument("task_file", default_value=str(task_file_path)),
+            DeclareLaunchArgument("imu_port", default_value="/dev/ttyUSB2"),
+            DeclareLaunchArgument("depth_port", default_value="/dev/ttyUSB0"),
             serial_dev_arg,
+            OpaqueFunction(function=validate_serial_ports),
+            xsens_mti_node,
             micro_ros_agent,
             #snappyComputerVision,
             pressure_sensor_node,
             dvl,
             state_estimator_node,
-         #   controller_node,
-            # planner_node,
+            controller_node,
+            planner_node,
   #          solenoid_channel_node,
         ]
     )

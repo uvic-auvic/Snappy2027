@@ -1,6 +1,9 @@
 # Task list for the planner node (pass via the task_file param).
-# Angles are in degrees; z is carried for schema consistency but the
-# controller's target depth is pinned by controller_params.yaml.
+# x/y/z are RELATIVE translations along the fixed mission axes (metres).
+# Angles are ABSOLUTE roll/pitch/yaw targets in degrees.
+# This attitude-test example needs tuned nonzero roll/pitch gains, which are
+# intentionally zero in the default controller config. It will fail explicitly
+# until those gains are configured. Each z: 1.0 adds another metre of depth.
 
 # The pitch, roll and yaw values are degrees, but the controller expects radians. The planner node will convert these values to 
 # radians before sending them to the controller.

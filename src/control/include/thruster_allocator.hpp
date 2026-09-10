@@ -29,6 +29,7 @@ class ThrusterAllocator {
          * @return The maximum saturation ratio
          */
         float getMaxSaturationRatio_(const Eigen::VectorXd &thrusts) const;
+        void validate() const;
 
     public:
         /*
@@ -51,6 +52,12 @@ class ThrusterAllocator {
          * @return The allocated thruster forces.
          */
         Eigen::VectorXd allocate(const Eigen::VectorXd &wrench) const;
+        // Reserve the feasible pure-Fz allocation, then fit other axes in the
+        // remaining motor headroom. Wrench order: Fx, Fy, Fz, Tx, Ty, Tz.
+        Eigen::VectorXd allocate_depth_priority(const Eigen::VectorXd &wrench) const;
+        // Priority and total wrench must be expressed in the same body frame.
+        Eigen::VectorXd allocate_with_priority(const Eigen::VectorXd &wrench,
+                                              const Eigen::VectorXd &priority_wrench) const;
         Eigen::MatrixXd get_configuration() const;
         Eigen::VectorXd get_min_thrust() const;
         Eigen::VectorXd get_max_thrust() const;
