@@ -166,7 +166,7 @@ class Controller : public rclcpp::Node {
             //    100ms, std::bind(&Controller::trajectory_callback, this));
 
 
-            timer_ = this->create_wall_timer(20ms, std::bind(&Controller::timer_callback, this));
+            timer_ = this->create_wall_timer(100ms, std::bind(&Controller::timer_callback, this));
             //RCLCPP_INFO(this->get_logger(), "Timer Node started");
 
         }
@@ -311,6 +311,13 @@ class Controller : public rclcpp::Node {
             float thrust_y = pid_y_.update(-relative_position[1]);
             float thrust_z = pid_z_.update(-relative_position[2]);
 
+            Eigen::Vector3d thrust(thrust_x, thrust_y, thrust_z);
+            Eigen::Vector3d force_world(0.0, 0.0, 5.0); //Account for buoyant force
+
+            Eigen::Vector3d force_body = current_orientation.inverse() * force_world;
+
+            Eigen::Vector3d new_thrust = thrust + force_body;
+
             float thrust_yaw = pid_yaw_.update(-yaw);
             float thrust_pitch = pid_pitch_.update(-pitch);
             float thrust_roll = pid_roll_.update(-roll);
@@ -321,7 +328,7 @@ class Controller : public rclcpp::Node {
 
             // Create wrench vector to be returned
             Eigen::VectorXd wrench(6);
-            wrench << thrust_x, thrust_y, thrust_z + 5.0f, thrust_roll, thrust_pitch, thrust_yaw;
+            wrench << new_thrust[0], new_thrust[1], new_thrust[2], thrust_roll, thrust_pitch, thrust_yaw;
 
             return wrench;
         }
@@ -518,7 +525,7 @@ class Controller : public rclcpp::Node {
         void task_callback(const snappy_interfaces::msg::Task & msg) {
             target_position.x() = msg.x;
             target_position.y() = msg.y;
-//	    target_position.z() = msg.z;
+    	    target_position.z() = msg.z;
             // Depth is pinned: target_position[2] comes from the
             // target_position param at construction — never from a task.
 
@@ -577,7 +584,7 @@ class Controller : public rclcpp::Node {
         std::optional<geometry_msgs::msg::Point> position_target_;
         geometry_msgs::msg::Quaternion orientation_current_;
         std::optional<geometry_msgs::msg::Quaternion> orientation_target_;
-        const double error_threshold = 0.2;
+        const double error_threshold = 0.15;
 
         rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr pub_;
         rclcpp::TimerBase::SharedPtr timer_;

@@ -72,7 +72,7 @@ def generate_launch_description():
             "-b",
             "115200",
         ],
-        output="screen",
+        #output="screen",
     )
 
     xsens_parameters_file_path = Path(
@@ -97,7 +97,7 @@ def generate_launch_description():
     )
 
     controller_node = TimerAction(
-        period=8.0,
+        period=6.0,
         actions=[
             Node(
                 package="snappy_control",
@@ -140,7 +140,7 @@ def generate_launch_description():
         )
 
     planner_node = TimerAction(
-        period=10.0,
+        period=6.7,
         actions=[
             Node(
                 package="snappy_autonomy",
@@ -166,15 +166,15 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            xsens_mti_node,
             serial_dev_arg,
             micro_ros_agent,
-            #snappyComputerVision,
+            xsens_mti_node,
+            # snappyComputerVision,
             pressure_sensor_node,
-            dvl,
+            #dvl,
             state_estimator_node,
-         #   controller_node,
-            # planner_node,
+            controller_node,
+            planner_node,
   #          solenoid_channel_node,
         ]
     )

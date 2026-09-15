@@ -1,15 +1,18 @@
 # uses radians for pitch, roll, and yaw
 controller:
   ros__parameters:
-    target_position: [0.0, 0.0, 2.0]
+    target_position: [0.0, 0.0,1.0]
     target_roll: 0.0
     target_pitch: 0.0
     target_yaw: 0.0
-    kill_timeout_s: 120.0
+    kill_timeout_s: 20.0
 
     pid_x: [2.0, 0.04, 0.0]
     pid_y: [1.0, 0.04, 0.0]
     pid_z: [0.72, 0.08, 0.76]
     pid_roll: [0.0, 0.0, 0.0]
     pid_pitch: [0.0, 0.0, 0.0]
-    pid_yaw: [0.6, 0.05, 1.725]
+    pid_yaw: [0.0, 0.0, 0.0]
+    # pid_roll: [0.1, 0.1, 0.0]
+    # pid_pitch: [0.3, 0.1, 0.0]
+    # pid_yaw: [0.6, 0.05, 0.0]
