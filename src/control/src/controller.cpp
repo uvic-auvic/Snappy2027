@@ -319,7 +319,7 @@ class Controller : public rclcpp::Node {
             Eigen::Vector3d new_thrust = thrust + force_body;
 
             float thrust_yaw = pid_yaw_.update(-yaw);
-            float thrust_pitch = pid_pitch_.update(pitch);
+            float thrust_pitch = pid_pitch_.update(-pitch);
             float thrust_roll = pid_roll_.update(-roll);
 
             // Create wrench vector to be returned

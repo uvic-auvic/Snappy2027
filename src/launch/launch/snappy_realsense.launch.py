@@ -169,12 +169,12 @@ def generate_launch_description():
             serial_dev_arg,
             micro_ros_agent,
             xsens_mti_node,
-            snappyComputerVision,
+            # snappyComputerVision,
             pressure_sensor_node,
             #dvl,
             state_estimator_node,
             controller_node,
-            # planner_node,
+            planner_node,
   #          solenoid_channel_node,
         ]
     )

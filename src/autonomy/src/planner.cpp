@@ -48,7 +48,7 @@ public:
             tasks_(i, 4) = t["roll"].as<double>();
             tasks_(i, 5) = t["yaw"].as<double>();
         }
-        //RCLCPP_INFO(this->get_logger(), "Loaded %ld tasks from %s", tasks_.rows(), task_file.c_str());
+        RCLCPP_INFO(this->get_logger(), "Loaded %ld tasks from %s", tasks_.rows(), task_file.c_str());
 
         // Transient local so the controller still gets the current task if it
         // starts (or restarts) after the planner published it.
@@ -76,7 +76,7 @@ private:
 
         current_seq_ = seq;
         task_publisher_->publish(msg);
-        //RCLCPP_INFO(this->get_logger(), "Published task %d of %ld", seq, tasks_.rows());
+        RCLCPP_INFO(this->get_logger(), "Published task %d of %ld", seq, tasks_.rows());
 
         total_x += msg.x;
         total_y += msg.y;
@@ -86,13 +86,13 @@ private:
     void done_callback(const std_msgs::msg::Int32 & msg)
     {
         if (mission_complete_ || msg.data != current_seq_) {
-            return;
+            RCLCPP_INFO(this->get_logger(), "Ignoring done signal for task %d", msg.data);
         }
 
         int next = current_seq_ + 1;
         if (next >= tasks_.rows()) {
             mission_complete_ = true;
-            //RCLCPP_INFO(this->get_logger(), "mission complete");
+            RCLCPP_INFO(this->get_logger(), "mission complete");
             return;
         }
         publish_task(next);
