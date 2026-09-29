@@ -1,0 +1,15 @@
+repositories:
+  external/xsens_mti_ros2_driver:
+    type: git
+    url: https://github.com/uvic-auvic/Xsens_MTi_ROS_Driver_and_Ntrip_Client.git
+    version: f0b093ce73e49bf4db5f39168567b80706c9838b
+
+  external/realsense-ros:
+    type: git
+    url: https://github.com/uvic-auvic/realsense-ros.git
+    version: 775b167c0dbcfe00a012e248c66a7c8379ef9fbb
+
+  external/waterlinked_dvl:
+    type: git
+    url: https://github.com/uvic-auvic/waterlinked_dvl.git
+    version: 1653c12192568000a6323425069e2322e5ea3c2b
