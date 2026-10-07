@@ -21,6 +21,13 @@ For an x86_64 Linux development machine:
 ./scripts/setup_docker.sh
 ```
 
+After the initial setup, start the existing development container and open a
+shell in it with:
+
+```bash
+./scripts/run_docker.sh
+```
+
 For the Jetson Orin running JetPack 6:
 
 ```bash
