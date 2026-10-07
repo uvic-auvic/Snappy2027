@@ -1,7 +1,7 @@
 // displayFeed.cpp
 // Standalone manual-launch visualization node. Subscribes to BOTH the front
 // (D455) and bottom (D405) camera image + detection topics, annotates each
-// frame independently, stacks them vertically, and shows the combined result
+// frame independently, places them side by side, and shows the combined result
 // in a single OpenCV window.
 //
 // Image and detection streams are subscribed INDEPENDENTLY (no time-sync):
@@ -19,6 +19,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 
+#include <algorithm>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -42,7 +43,7 @@ public:
 
         // Front camera (D455) -- image and detections subscribed independently.
         front_image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
-            "/d455/color/image_raw", rclcpp::SensorDataQoS(),
+            "/d455/d455/color/image_raw", rclcpp::SensorDataQoS(),
             [this](const sensor_msgs::msg::Image::ConstSharedPtr & msg) {
                 std::lock_guard<std::mutex> lock(front_mutex_);
                 front_image_ = msg;
@@ -56,7 +57,7 @@ public:
 
         // Bottom camera (D405).
         bottom_image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
-            "/d405/color/image_rect_raw", rclcpp::SensorDataQoS(),
+            "/d405/d405/color/image_raw", rclcpp::SensorDataQoS(),
             [this](const sensor_msgs::msg::Image::ConstSharedPtr & msg) {
                 std::lock_guard<std::mutex> lock(bottom_mutex_);
                 bottom_image_ = msg;
@@ -201,8 +202,18 @@ private:
         cv::Mat front_resized = resize_to_width(front_frame, display_width_, "FRONT (D455)");
         cv::Mat bottom_resized = resize_to_width(bottom_frame, display_width_, "BOTTOM (D405)");
 
+        // Horizontal concatenation requires matching heights. Pad the shorter
+        // panel instead of stretching images with different aspect ratios.
+        const int panel_height = std::max(front_resized.rows, bottom_resized.rows);
+        cv::copyMakeBorder(front_resized, front_resized, 0,
+            panel_height - front_resized.rows, 0, 0, cv::BORDER_CONSTANT,
+            cv::Scalar(40, 40, 40));
+        cv::copyMakeBorder(bottom_resized, bottom_resized, 0,
+            panel_height - bottom_resized.rows, 0, 0, cv::BORDER_CONSTANT,
+            cv::Scalar(40, 40, 40));
+
         cv::Mat combined;
-        cv::vconcat(front_resized, bottom_resized, combined);
+        cv::hconcat(front_resized, bottom_resized, combined);
 
         cv::imshow(display_window_name_, combined);
         if (cv::waitKey(1) == 27) {
@@ -218,7 +229,7 @@ private:
         cv::Mat out;
         if (frame.empty()) {
             // No frame received yet for this camera -- show a placeholder
-            // rather than skipping it, so the stack size stays consistent.
+            // rather than skipping it, so both camera panels remain visible.
             out = cv::Mat(target_width * 9 / 16, target_width, CV_8UC3, cv::Scalar(40, 40, 40));
             cv::putText(out, label + " - no signal", {20, out.rows / 2},
                 cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);

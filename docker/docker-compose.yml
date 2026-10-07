@@ -5,11 +5,14 @@ services:
     image: nil2thrill/snappy-ros:humble
     container_name: snappy2027-dev
     working_dir: /ros2_ws
+    environment:
+      DISPLAY: ${DISPLAY:-:0}
     volumes:
       - ..:/ros2_ws
       - snappy_dev_build:/ros2_ws/build
       - snappy_dev_install:/ros2_ws/install
       - snappy_dev_log:/ros2_ws/log
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
       - ../snappy_data:/home/snappy_data
       - /dev:/dev
     privileged: true

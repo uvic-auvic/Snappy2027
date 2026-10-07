@@ -54,3 +54,5 @@ snappy_inference/
 # Videos Saved by cameras
 snappy_data/
 models/
+# Generated VS Code C++ browsing database
+/.vscode/browse.vc.db*

@@ -32,6 +32,15 @@ rosdep install \
   -r -y
 
 echo "--- Building Snappy2027 ---"
+# A previous build without --symlink-install leaves a copied Python package
+# where ament now needs to create a symlink. Preserve it outside that path.
+interfaces_python_dir="build/snappy_interfaces/ament_cmake_python/snappy_interfaces/snappy_interfaces"
+if [[ -d "${interfaces_python_dir}" && ! -L "${interfaces_python_dir}" ]]; then
+  backup_dir="$(mktemp -d build/snappy_interfaces/python-copy-backup.XXXXXX)"
+  mv -- "${interfaces_python_dir}" "${backup_dir}/snappy_interfaces"
+  echo "Preserved previous generated Python package in ${backup_dir}"
+fi
+
 build_args=(--symlink-install --executor sequential --cmake-args -DBUILD_TESTING=OFF)
 if [[ "${SNAPPY_WITH_CUDA:-OFF}" == "ON" ]]; then
   build_args+=( -DWITH_CUDA=ON )

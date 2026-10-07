@@ -9,12 +9,19 @@ from launch.actions import (
     TimerAction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
+    camera_mode_arg = DeclareLaunchArgument(
+        "camera_mode",
+        default_value="underwater",
+        choices=["underwater", "above_water"],
+        description="Camera settings: underwater compensation or automatic above-water color/exposure.",
+    )
+    camera_mode = LaunchConfiguration("camera_mode")
     capture_target_arg = DeclareLaunchArgument(
         "capture_target",
         default_value="both",
@@ -60,10 +67,15 @@ def generate_launch_description():
             "camera_name": "d455",
             "serial_no": serial_no_d455,
             "json_file_path": PathJoinSubstitution(
-                [FindPackageShare("snappy_computer_vision"), "config", "d455_underwater.json"]
+                [FindPackageShare("snappy_computer_vision"), "config", ["d455_", camera_mode, ".json"]]
             ),
-            # "json_file_path": PathJoinSubstitution([FindPackageShare("snappy_computer_vision"), "config", "test455.json"]),
             "rgb_camera.color_profile": "848x480x30",
+            "rgb_camera.enable_auto_exposure": PythonExpression(
+                ["'", camera_mode, "' == 'above_water'"]
+            ),
+            "depth_module.enable_auto_exposure": PythonExpression(
+                ["'", camera_mode, "' == 'above_water'"]
+            ),
             "enable_gyro": "true",
             "enable_accel": "true",
             "unite_imu_method": "2",
@@ -86,10 +98,15 @@ def generate_launch_description():
             "camera_name": "d405",
             "serial_no": serial_no_d405,
             "json_file_path": PathJoinSubstitution(
-                [FindPackageShare("snappy_computer_vision"), "config", "d405_underwater.json"]
+                [FindPackageShare("snappy_computer_vision"), "config", ["d405_", camera_mode, ".json"]]
             ),
-            # "json_file_path": PathJoinSubstitution([FindPackageShare("snappy_computer_vision"), "config", "test405.json"]),
             "rgb_camera.color_profile": "848x480x30",
+            "rgb_camera.enable_auto_exposure": PythonExpression(
+                ["'", camera_mode, "' == 'above_water'"]
+            ),
+            "depth_module.enable_auto_exposure": PythonExpression(
+                ["'", camera_mode, "' == 'above_water'"]
+            ),
             "enable_gyro": "false",  # D405 does not include IMU
             "enable_accel": "false",
             "unite_imu_method": "0",
@@ -149,6 +166,7 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
+            camera_mode_arg,
             capture_target_arg,
             capture_mode_arg,
             serial_no_d455_arg,
