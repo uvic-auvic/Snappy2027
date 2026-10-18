@@ -30,7 +30,8 @@ def generate_launch_description():
     capture_mode_arg = DeclareLaunchArgument(
         "capture_mode",
         default_value="video", # set to video for sea trial, image should be default otherwise
-        description="Capture mode for each selected camera: image or video.",
+        choices=["image", "video", "none"],
+        description="Capture mode for each selected camera: image, video, or none.",
     )
 
     # Launch arguments for serial numbers (with defaults)

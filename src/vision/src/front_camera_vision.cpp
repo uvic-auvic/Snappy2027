@@ -71,7 +71,7 @@ public:
 
         capture_enabled_ = (capture_target_ == "both" || capture_target_ == camera_name_);
 
-        if (capture_mode_ != "image" && capture_mode_ != "video") {
+        if (capture_mode_ != "image" && capture_mode_ != "video" && capture_mode_ != "none") {
             RCLCPP_WARN(get_logger(), "Unsupported capture_mode '%s'; defaulting to 'video'",
                         capture_mode_.c_str());
             capture_mode_ = "video";
@@ -264,6 +264,10 @@ private:
             if (video_writer_.isOpened()) {
                 video_writer_ << image;
             }
+            return;
+        }
+
+        if (capture_mode_ == "none") {
             return;
         }
 
