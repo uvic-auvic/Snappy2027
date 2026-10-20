@@ -1,0 +1,15 @@
+<root BTCPP_format="4">
+    <BehaviorTree ID="MainTree">
+        <Sequence name="StartSequence">
+            <!-- 1. Stays here until system is ready -->
+            <CheckStartReady />
+            
+            <!-- 2. Once ready, moves here and scans the gate -->
+            <CheckScanGate />
+
+            <!-- 3. Once ready, moves here and passes the gate -->
+            <CheckPassGate />
+            
+        </Sequence>
+    </BehaviorTree>
+</root>

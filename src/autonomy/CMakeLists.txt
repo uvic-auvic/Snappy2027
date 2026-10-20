@@ -15,6 +15,7 @@ find_package(rclcpp REQUIRED)
 find_package(snappy_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(yaml_cpp_vendor REQUIRED)
+find_package(behaviortree_cpp REQUIRED)
 
 add_executable(planner src/planner.cpp)
 ament_target_dependencies(planner
@@ -23,7 +24,7 @@ ament_target_dependencies(planner
   std_msgs
   yaml_cpp_vendor
 )
-target_link_libraries(planner Eigen3::Eigen)
+target_link_libraries(planner Eigen3::Eigen behaviortree_cpp::behaviortree_cpp)
 
 install(
   TARGETS planner
