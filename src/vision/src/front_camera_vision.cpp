@@ -40,6 +40,8 @@
 #include <geometry_msgs/msg/point32.hpp>
 #include "snappy_computer_vision/detection_classes.hpp"
 
+#include ""
+
 
 using namespace std::chrono_literals;
 
@@ -53,7 +55,7 @@ public:
     {
         // Declare parameters
         inference_hz_ = this->declare_parameter<double>("inference_hz", 0.0);
-        conf_threshold_ = this->declare_parameter<double>("conf_threshold", 0.5);
+        conf_threshold_ = this->declare_parameter<double>("conf_threshold", 0.1);
         engine_path_ = this->declare_parameter<std::string>(
             "engine_path", "/home/kraken/Desktop/ffc_rs_26.engine");
         num_classes_ = this->declare_parameter<int>("num_classes", 8);
@@ -250,6 +252,15 @@ private:
                     save_image(job.image, job.timestamp);
                 }
             }
+            std::vector<snappy_tracking::TrackInput> in;
+            for (auto & d : detections)
+                in.push_back({d.x1, d.y1, d.x2, d.y2, d.confidence, d.class_id});
+
+            auto tracks = tracker_.update(in);
+            
+            for (auto & t : tracks)
+                RCLCPP_INFO(get_logger(), "Frame %d: Track ID %d, Class %d, Confidence %.2f, BBox [%.0f %.0f %.0f %.0f]",
+                tracker_.frameCount(), t.track_id, t.cls, t.conf, t.x1, t.y1, t.x2, t.y2);
             publish_detections(detections, job.timestamp, inference_ms);
         }
     }
@@ -632,6 +643,7 @@ private:
             obj.object_class = class_name_for(det.class_id);
             obj.distance_m = det.distance_m;
             obj.timestamp = timestamp;
+            obj.trackid =  static_cast<uint32_t>(track_id);
 
             snappy_interfaces::msg::BoundingBox2D bbox;
             bbox.x = det.x1;
