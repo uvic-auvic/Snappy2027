@@ -1,0 +1,6 @@
+services:
+  snappy2027:
+    image: snappy2027
+    build:
+      context: .
+      dockerfile: ./Dockerfile

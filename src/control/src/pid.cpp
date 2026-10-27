@@ -12,7 +12,6 @@ PID::PID(float Kp, float Ki, float Kd) {
     this->MAX = 100.0f;
 }
 
-hjhj
 void PID::set_target(float target) {
     target_ = target;
     integral_ = 0; // Reset integral
