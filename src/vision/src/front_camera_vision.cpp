@@ -1,6 +1,7 @@
 // front_camera_vision.cpp
 // Headless YOLOv26 segmentation inference node for D455 camera
 // Publishes DetectionArray for external visualization nodes
+// TODO: any cleanup changes here should likely be applied to bottom_camera_vision.cpp as well
 
 #include <rclcpp/rclcpp.hpp>
 #include <NvInfer.h>
