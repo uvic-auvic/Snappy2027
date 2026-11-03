@@ -119,7 +119,7 @@ public:
         RCLCPP_INFO(get_logger(), "Front Camera Vision ready");
     }
 
-    ~FrontCameraVision() override
+    ~FrontCameraVision() override //shutdown Ctrl+C
     {
         {
             std::lock_guard<std::mutex> lock(video_mutex_);
@@ -150,6 +150,7 @@ public:
 private:
     // ---- Data types --------------------------------------------------------
 
+    // Struct to hold a single inference job, including the color image, depth image, depth encoding, and timestamp.
     struct InferenceJob {
         cv::Mat image;
         cv::Mat depth_image;
@@ -157,6 +158,7 @@ private:
         rclcpp::Time timestamp;
     };
 
+    // Struct to hold a single detection result, including bounding box coordinates, confidence score, class ID, estimated distance, and mask polygon.
     struct Detection {
         float x1, y1, x2, y2;
         float confidence;
@@ -165,6 +167,7 @@ private:
         std::vector<cv::Point2f> mask_polygon;
     };
 
+    // Struct to hold anchor information for YOLOv26, including position, size, confidence score, class ID, and mask coefficients.
     struct Anchor {
         float x, y, w, h;
         float confidence;
@@ -182,6 +185,7 @@ private:
         const sensor_msgs::msg::Image::ConstSharedPtr & color_msg,
         const sensor_msgs::msg::Image::ConstSharedPtr & depth_msg)
     {
+        // this is essentially dead code right now since inference_hz_ is set to 0.0, but is being left in the code in case we want to limit the inference rate in the future.
         const auto now = this->get_clock()->now();
         if (last_inference_time_.has_value()) {
             const double elapsed = (now - *last_inference_time_).seconds();
@@ -192,6 +196,7 @@ private:
         last_inference_time_ = now;
 
         try {
+            //why does it create these pointers? I think it is because the cv_bridge::toCvShare returns a shared pointer to a CvImage, which contains the OpenCV image data. The shared pointer allows for efficient memory management and avoids unnecessary copies of the image data. By using shared pointers, multiple parts of the code can safely access the same image data without worrying about ownership or lifetime issues.
             auto color_ptr = cv_bridge::toCvShare(color_msg, "bgr8");
             auto depth_ptr = cv_bridge::toCvShare(depth_msg);
 
@@ -204,15 +209,14 @@ private:
             if (capture_enabled_) {
                 write_capture_frame(job.image, job.timestamp);
             }
-
-            {
-                std::lock_guard<std::mutex> lock(queue_mutex_);
-                // Drop oldest frame if queue is full (never accumulate latency)
-                while (job_queue_.size() >= 2) {
-                    job_queue_.pop_front();
-                }
-                job_queue_.push_back(std::move(job));
+            
+            std::lock_guard<std::mutex> lock(queue_mutex_);
+            // Drop oldest frame if queue is full (never accumulate latency)
+            while (job_queue_.size() >= 2) {
+                job_queue_.pop_front();
             }
+            job_queue_.push_back(std::move(job));
+            
             queue_cv_.notify_one();
         } catch (const cv_bridge::Exception & e) {
             RCLCPP_ERROR(get_logger(), "cv_bridge error: %s", e.what());
@@ -220,20 +224,20 @@ private:
     }
 
     // ---- Inference worker thread -------------------------------------------
-
+    //this may be good to seperate into different folders
     void inference_worker()
     {
         while (worker_running_) {
             InferenceJob job;
-            {
-                std::unique_lock<std::mutex> lock(queue_mutex_);
-                queue_cv_.wait(lock, [this] {
-                    return !worker_running_ || !job_queue_.empty();
-                });
-                if (!worker_running_ && job_queue_.empty()) break;
-                job = std::move(job_queue_.front());
-                job_queue_.pop_front();
-            }
+
+            std::unique_lock<std::mutex> lock(queue_mutex_);
+            queue_cv_.wait(lock, [this] {
+                return !worker_running_ || !job_queue_.empty();
+            });
+            if (!worker_running_ && job_queue_.empty()) break;
+            job = std::move(job_queue_.front());
+            job_queue_.pop_front();
+
 
             if (job.image.empty()) continue;
 
@@ -254,6 +258,7 @@ private:
         }
     }
 
+    //could be seperate file, but it is not a big deal. It is just a helper function to write the captured frame to disk. It is not part of the inference pipeline, so it does not need to be in the same file as the inference code.
     void write_capture_frame(const cv::Mat &image, const rclcpp::Time &timestamp)
     {
         if (capture_mode_ == "video") {
@@ -279,7 +284,7 @@ private:
         //std::filesystem::create_directories(video_capture_dir_, std::error_code{});
         std::error_code ec;
         std::filesystem::create_directories(video_capture_dir_, ec);
-
+https://www.youtube.com/watch?v=uihBwtPIBxM&t=20
         const auto now = std::chrono::system_clock::now();
         const auto tt = std::chrono::system_clock::to_time_t(now);
         std::tm tm_buf{};
