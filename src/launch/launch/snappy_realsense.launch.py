@@ -25,6 +25,11 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
+    camera_mode_arg = DeclareLaunchArgument(
+        "camera_mode", default_value="underwater",
+        choices=["underwater", "above_water"],
+        description="Camera settings for underwater operation or an above-water demo.",
+    )
 
     snappyComputerVision = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -38,6 +43,7 @@ def generate_launch_description():
                 )
             ]
         ),
+        launch_arguments={"camera_mode": LaunchConfiguration("camera_mode")}.items(),
     )
 
     dvl = IncludeLaunchDescription(
@@ -166,15 +172,15 @@ def generate_launch_description():
 
     return LaunchDescription(
         [
-            serial_dev_arg,
-            micro_ros_agent,
-            xsens_mti_node,
-            # snappyComputerVision,
-            pressure_sensor_node,
+            # serial_dev_arg,
+            # micro_ros_agent,
+            # xsens_mti_node,
+            snappyComputerVision,
+            # pressure_sensor_node,
             #dvl,
-            state_estimator_node,
-            controller_node,
-            planner_node,
+            # state_estimator_node,
+            # controller_node,
+            # planner_node,
   #          solenoid_channel_node,
         ]
     )

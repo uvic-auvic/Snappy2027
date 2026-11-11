@@ -71,24 +71,18 @@ if(WITH_CUDA)
     )
   endforeach()
 
-  add_executable(displayFeed src/displayFeed.cpp)
-  ament_target_dependencies(displayFeed
-    cv_bridge
-    message_filters
-    rclcpp
-    sensor_msgs
-    snappy_interfaces
-  )
-  target_link_libraries(displayFeed ${OpenCV_LIBS})
-
   install(
-    TARGETS front_camera_vision bottom_camera_vision displayFeed
+    TARGETS front_camera_vision bottom_camera_vision
     DESTINATION lib/${PROJECT_NAME}
   )
 endif()
 
+add_executable(displayFeed src/displayFeed.cpp)
+ament_target_dependencies(displayFeed cv_bridge rclcpp sensor_msgs snappy_interfaces)
+target_link_libraries(displayFeed ${OpenCV_LIBS})
+
 install(
-  TARGETS image_capture
+  TARGETS image_capture displayFeed
   DESTINATION lib/${PROJECT_NAME}
 )
 
