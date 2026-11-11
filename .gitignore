@@ -27,6 +27,7 @@ __pycache__/
 *.swo
 .DS_STORE
 .DS_Store
+.vscode/
 
 # === Large mesh / hydrodynamics artifacts ===
 src/snappy_cpp/worlds/2025-2026_Full_ASSEMBLY.dae
