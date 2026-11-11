@@ -1,0 +1,19 @@
+# Jetson -> mower board: per-sector auto logging and on-demand snapshots.
+# Service: /mower/status_request. rates_hz[i] belongs to sector bit i.
+
+uint8 SECTOR_MOTORS=1
+uint8 SECTOR_TEMPS=2
+uint8 SECTOR_AMBIENT=4
+uint8 SECTOR_POWER=8
+uint8 SECTOR_GROUND_FAULT=16
+uint8 SECTOR_RAILS=32
+uint8 SECTOR_DIAG=64
+uint8 SECTOR_ALL=127
+
+uint8 sector_mask   # sectors this request applies to
+bool repeat         # false: snapshot in the reply only; true: also set auto-log rate
+float32 rate_hz     # repeat=true: rate for masked sectors, 0 = off (0.1..20 Hz)
+---
+bool accepted
+float32[7] rates_hz # auto-log rate of every sector after this request
+MowerStatus status  # snapshot of the masked sectors

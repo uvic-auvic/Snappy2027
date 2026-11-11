@@ -22,10 +22,20 @@ set(msg_files
   "msg/Task.msg"
   "msg/ThrusterCommand.msg"
   "msg/MowerBoardStatus.msg"
+  "msg/MotorStatus.msg"
+  "msg/TempStatus.msg"
+  "msg/AmbientStatus.msg"
+  "msg/PowerStatus.msg"
+  "msg/GroundFaultStatus.msg"
+  "msg/RailStatus.msg"
+  "msg/DiagStatus.msg"
+  "msg/MowerStatus.msg"
 )
 
 set(srv_files
   "srv/SetPowerState.srv"
+  "srv/StatusRequest.srv"
+  "srv/MowerConfig.srv"
 )
 
 set(action_files

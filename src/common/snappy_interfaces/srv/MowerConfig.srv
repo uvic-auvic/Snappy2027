@@ -1,0 +1,13 @@
+# Jetson -> mower board settings. Service: /mower/config
+# Values <= 0 leave that setting unchanged. Settings reset at board reboot.
+
+float32 gf_vbat_v       # battery voltage for the leak estimate (4S nominal 14.8)
+float32 gf_trip_kohm    # ground fault flag below this leak resistance
+bool gf_zero_now        # take the current GFout as the no-leak baseline
+float32 temp_limit_c    # motor-temp alert limit (TMP1075 ALERT + over_limit)
+---
+bool success
+float32 gf_vbat_v
+float32 gf_trip_kohm
+float32 gf_baseline_v
+float32 temp_limit_c
