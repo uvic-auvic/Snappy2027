@@ -1,0 +1,7 @@
+/**:
+  ros__parameters:
+    # Synthetic sensor envelope ONLY. These are not approved operating limits.
+    min_depth_m: 0.0
+    max_depth_m: 5.0
+    motor_output_enabled: false
+    kill_timeout_s: 120.0

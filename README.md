@@ -13,6 +13,13 @@ Initial software is being migrated from:
 
 Simulation and embedded firmware are maintained separately from this repository.
 
+## PS4 ROV mode
+
+See [docs/rov.md](docs/rov.md) for the dedicated ROV launch, PS4 mapping,
+depth-PID integration, safety behavior and controller-free simulation/tests.
+Physical thruster output is disabled by default; approved depth limits are
+required before enabling it.
+
 ## Docker
 
 For an x86_64 Linux development machine:

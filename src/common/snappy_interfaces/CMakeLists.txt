@@ -18,6 +18,7 @@ set(msg_files
   "msg/DetectionArray.msg"
   "msg/ObjectDetection.msg"
   "msg/Pose.msg"
+  "msg/RovCommand.msg"
   "msg/Polygon2D.msg"
   "msg/Task.msg"
   "msg/ThrusterCommand.msg"

@@ -18,6 +18,7 @@ class PID {
     public:
         PID(float Kp, float Ki, float Kd); // Constructor
         void set_target(float target);
+        void reset(float current); // Clear history before re-enabling a stopped controller.
         float update(float current); // Return the magnitude of movement
 };
 

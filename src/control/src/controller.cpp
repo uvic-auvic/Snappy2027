@@ -31,13 +31,14 @@
 
 #include "pid.hpp"
 #include "thruster_allocator.hpp"
+#include "rov_control.hpp"
 
 using namespace std::chrono_literals;
 using std::placeholders::_1;
 
 class Controller : public rclcpp::Node {
     public:
-        Controller() : Node("controller"),
+        explicit Controller(bool rov_configuration = false) : Node("controller"),
             pid_x_(0.0f, 0.0f, 0.0f),
             pid_y_(0.0f, 0.0f, 0.0f),
             pid_z_(0.0f, 0.0f, 0.0f),
@@ -66,6 +67,12 @@ class Controller : public rclcpp::Node {
              std::vector<double> ppitch = get_parameter("pid_pitch").as_double_array();
              std::vector<double> pyaw = get_parameter("pid_yaw").as_double_array();
 
+             for (const auto * gains : {&px, &py, &pz, &proll, &ppitch, &pyaw}) {
+                 if (gains->size() != 3 || !std::all_of(gains->begin(), gains->end(),
+                     [](double value) { return std::isfinite(value); }))
+                     throw std::invalid_argument("Each PID gain array must contain three finite values");
+             }
+
              // 3. Re-instantiate the PID objects with the live YAML values
              pid_x_ = PID(px[0], px[1], px[2]);
              pid_y_ = PID(py[0], py[1], py[2]);
@@ -75,6 +82,9 @@ class Controller : public rclcpp::Node {
              pid_yaw_ = PID(pyaw[0], pyaw[1], pyaw[2]);
 
              std::vector<double> target_position_vec = get_parameter("target_position").as_double_array();
+             if (target_position_vec.size() != 3 || !std::all_of(target_position_vec.begin(),
+                 target_position_vec.end(), [](double value) { return std::isfinite(value); }))
+                 throw std::invalid_argument("target_position must contain three finite values");
              target_position = Eigen::Vector3d(target_position_vec[0], target_position_vec[1], target_position_vec[2]);
 
              double roll = get_parameter("target_roll").as_double();
@@ -107,11 +117,16 @@ class Controller : public rclcpp::Node {
 
             //publish motor command
             // Match the STM32 micro-ROS subscription: same type AND best-effort QoS.
-            motor_publisher_ = create_publisher<snappy_interfaces::msg::ThrusterCommand>(
-                "/motor_cmd", rclcpp::QoS(10).best_effort());
+            if (rov_configuration) {
+                rov_ = std::make_unique<RovControl>(*this, pid_z_, thruster_allocator);
+                motor_publisher_ = rov_->motor_publisher();
+            } else {
+                motor_publisher_ = create_publisher<snappy_interfaces::msg::ThrusterCommand>(
+                    "/motor_cmd", rclcpp::QoS(10).best_effort());
+            }
 
             const double kill_timeout_s = get_parameter("kill_timeout_s").as_double();
-            if (kill_timeout_s <= 0.0) {
+            if (!std::isfinite(kill_timeout_s) || kill_timeout_s <= 0.0) {
                 throw std::invalid_argument("kill_timeout_s must be greater than zero");
             }
             kill_deadline_ = std::chrono::steady_clock::now()
@@ -131,6 +146,7 @@ class Controller : public rclcpp::Node {
             // Receive tasks from planner. Transient local matches the
             // planner's latched publisher, so the current task is delivered
             // even if this node starts after it was published.
+            if (!rov_) {
             task_subscription_ = this->create_subscription<snappy_interfaces::msg::Task>(
                 "/planner/task", rclcpp::QoS(1).transient_local(),
                 std::bind(&Controller::task_callback, this, _1));
@@ -142,6 +158,7 @@ class Controller : public rclcpp::Node {
             // Receive states from state estimator
             state_subscription_ = this->create_subscription<snappy_interfaces::msg::Pose>(
                "state_estimator/state", 10, std::bind(&Controller::state_callback, this, _1));
+            }
 
              //Receive dpeth value from pressure node
              //depth_subscription_ = this->create_subscription<std_msgs::msg::Float32>(
@@ -189,8 +206,11 @@ class Controller : public rclcpp::Node {
                         "Thruster kill timer expired; all motor commands are now latched at zero");
                 }
                 publish_zero_thrust();
+                if (rov_) rov_->kill();
                 return;
             }
+
+            if (rov_) { rov_->tick(); return; }
 
             std::pair<Eigen::Vector3d, Eigen::Quaterniond> trajectory = generate_trajectory();
 
@@ -612,13 +632,18 @@ class Controller : public rclcpp::Node {
 
     	Eigen::MatrixXd configuration;
     	ThrusterAllocator thruster_allocator;
+        std::unique_ptr<RovControl> rov_;
 };
 
 
 
 int main(int argc, char* argv[]) {
     rclcpp::init(argc, argv);
+#ifdef SNAPPY_ROV_CONFIGURATION
+    rclcpp::spin(std::make_shared<Controller>(true));
+#else
     rclcpp::spin(std::make_shared<Controller>());
+#endif
     rclcpp::shutdown();
     return 0;
 }

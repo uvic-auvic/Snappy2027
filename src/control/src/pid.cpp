@@ -17,6 +17,12 @@ void PID::set_target(float target) {
     integral_ = 0; // Reset integral
 }
 
+void PID::reset(float current) {
+    integral_ = 0.0f;
+    prev_err_ = target_ - current;
+    prev_time_ = std::chrono::steady_clock::now();
+}
+
 float PID::update(float current) {
     // Get error
     float err = target_ - current;

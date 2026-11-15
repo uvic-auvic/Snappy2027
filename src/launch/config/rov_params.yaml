@@ -1,0 +1,28 @@
+/**:
+  ros__parameters:
+    # Common Linux joy_node DualShock 4 layout. Verify with /joy on real hardware.
+    forward_axis: 5                 # R2
+    reverse_axis: 2                 # L2
+    strafe_axis: 0                  # Left stick horizontal
+    yaw_axis: 3                     # Right stick horizontal
+    dpad_axis: 7                    # +1 up, -1 down; -1 selects button mapping
+    dpad_up_button: -1
+    dpad_down_button: -1
+    deadman_button: 4               # L1
+    stop_button: 1                  # Circle
+    trigger_released: 1.0           # Use 0.0/1.0 for zero-based triggers
+    trigger_pressed: -1.0
+    invert_strafe: true             # Vehicle +y is right
+    invert_yaw: true                # Positive yaw is right in z-down frame
+    invert_dpad: false
+    deadzone: 0.1
+    max_horizontal_thrust: 0.30
+    max_yaw_thrust: 0.30
+    depth_increment_m: 0.25
+    min_depth_m: 0.0
+    max_depth_m: -1.0               # REQUIRED: approved maximum; -1 disables thrust
+    surface_tolerance_m: 0.05       # Ignore D-pad UP at/near the surface
+    controller_timeout_s: 0.5
+    depth_timeout_s: 0.5
+    command_timeout_s: 0.5          # Independent controller watchdog
+    motor_output_enabled: false

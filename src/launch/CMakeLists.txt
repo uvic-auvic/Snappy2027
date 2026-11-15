@@ -3,6 +3,8 @@ project(snappy_launch)
 
 find_package(ament_cmake REQUIRED)
 
+install(PROGRAMS scripts/rov_simulator.py DESTINATION lib/${PROJECT_NAME})
+
 install(
   DIRECTORY config launch
   DESTINATION share/${PROJECT_NAME}

@@ -12,6 +12,11 @@
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
+  <exec_depend>joy</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>snappy_interfaces</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
   <exec_depend>micro_ros_agent</exec_depend>
   <exec_depend>snappy_autonomy</exec_depend>
   <exec_depend>snappy_computer_vision</exec_depend>
