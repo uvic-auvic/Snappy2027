@@ -41,9 +41,24 @@ if(WITH_CUDA)
     REQUIRED
   )
 
+  set(front_camera_vision_SRCS
+    src/front_camera/front_camera_vision.cpp
+    src/front_camera/node.cpp
+    src/front_camera/tensorrt_engine.cpp
+    src/front_camera/inference.cpp
+    src/front_camera/preprocess.cpp
+    src/front_camera/postprocess.cpp
+    src/front_camera/depth.cpp
+    src/front_camera/capture.cpp
+    src/front_camera/publishing.cpp
+  )
+  set(bottom_camera_vision_SRCS
+    src/bottom_camera_vision.cpp
+  )
+  
   foreach(camera_node front_camera_vision bottom_camera_vision)
     add_executable(${camera_node}
-      src/${camera_node}.cpp
+      ${${camera_node}_SRCS}
       src/preprocess_cuda.cu
     )
     target_include_directories(${camera_node} PRIVATE
