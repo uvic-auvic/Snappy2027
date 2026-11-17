@@ -10,6 +10,9 @@
             <!-- 3. Once ready, moves here and passes the gate -->
             <CheckPassGate />
             
+            <!-- 3. Once ready, moves here and runs the slalom -->
+            <RunSlalom />
+            
         </Sequence>
     </BehaviorTree>
 </root>
