@@ -3,6 +3,9 @@ import argparse
 import time
 import Jetson.GPIO as GPIO
 
+# open terminal and run the following command to activate the virtual environment
+# source ~/jetson-gpio-env/bin/activate
+
 # Torpedo 1 maps to Pin 21
 # Torpedo 2 maps to Pin 22
 TORPEDO_PINS = {
