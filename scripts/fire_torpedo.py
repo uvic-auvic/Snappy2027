@@ -6,13 +6,13 @@ import Jetson.GPIO as GPIO
 # Torpedo 1 maps to Pin 21
 # Torpedo 2 maps to Pin 22
 TORPEDO_PINS = {
-    1: 21,
-    2: 22,
+    1: 7,
+    2: 15,
 }
 
 # Duration to pulse the solenoid
 # TODO: Adjust duration based on testing
-PULSE_DURATION = 0.1
+PULSE_DURATION = 0.2
 
 
 def setup_gpio():
