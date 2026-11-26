@@ -45,7 +45,7 @@ if(WITH_CUDA)
     src/front_camera/front_camera_vision.cpp
     src/front_camera/node.cpp
     src/front_camera/tensorrt_engine.cpp
-    src/front_camera/inference.cpp
+    src/front_camera/runinference.cpp
     src/front_camera/preprocess.cpp
     src/front_camera/postprocess.cpp
     src/front_camera/depth.cpp
