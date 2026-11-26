@@ -4,8 +4,6 @@
 
 #include "front_camera_vision.hpp"
 
-// using namespace std::chrono_literals;
-
 std::vector<std::string> class_names_ = snappy_computer_vision::kFrontDetectionClasses;
 
 int main(int argc, char * argv[])

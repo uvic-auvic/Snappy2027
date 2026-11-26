@@ -9,7 +9,7 @@ FrontCameraVision::FrontCameraVision(const rclcpp::NodeOptions & options)
 {
     // Declare parameters
     inference_hz_ = this->declare_parameter<double>("inference_hz", 0.0);
-    conf_threshold_ = this->declare_parameter<double>("conf_threshold", 0.5);
+    high_conf_threshold_ = this->declare_parameter<double>("high_conf_threshold", 0.5);
     engine_path_ = this->declare_parameter<std::string>(
         "engine_path", "/home/kraken/Desktop/ffc_rs_26.engine");
     num_classes_ = this->declare_parameter<int>("num_classes", 8);
@@ -40,7 +40,7 @@ FrontCameraVision::FrontCameraVision(const rclcpp::NodeOptions & options)
 
     RCLCPP_INFO(get_logger(), "Front Camera Vision (YOLOv26 Seg) initializing...");
     RCLCPP_INFO(get_logger(), "  inference_hz: %.1f", inference_hz_);
-    RCLCPP_INFO(get_logger(), "  conf_threshold: %.2f", conf_threshold_);
+    RCLCPP_INFO(get_logger(), "  conf_threshold: %.2f", high_conf_threshold_);
     RCLCPP_INFO(get_logger(), "  engine_path: %s", engine_path_.c_str());
     RCLCPP_INFO(get_logger(), "  camera_name: %s", camera_name_.c_str());
     RCLCPP_INFO(get_logger(), "  capture_target: %s", capture_target_.c_str());
