@@ -98,11 +98,8 @@ def generate_launch_description():
         }.items(),
     )
 
-    # Single shared TensorRT inference node serving both cameras (D455 front,
-    # D405 bottom). Replaces the former front_cam + bottom_cam processes: one
-    # CUDA context / engine for all cameras. Add a camera by appending its
-    # namespace to camera_namespaces.
-    #
+    # Separate TensorRT inference nodes for the D455 front and D405 bottom
+    # cameras, each loading its own camera-specific segmentation model.
     front_camera_vision = TimerAction(
         period=3.0,
         actions=[
