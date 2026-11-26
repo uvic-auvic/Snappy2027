@@ -1,18 +1,21 @@
 <root BTCPP_format="4">
     <BehaviorTree ID="MainTree">
         <Sequence name="StartSequence">
-            <!-- 1. Stays here until system is ready -->
-            <CheckStartReady />
-            
+            <!-- 1. Dives and stays here until the sub is submerged -->
+            <CheckSubmerged />
+
+            <!-- 1a. Rises and stays here until the sub is surfaced -->
+            <CheckSurfaced />
+
             <!-- 2. Once ready, moves here and scans the gate -->
-            <CheckScanGate />
+            <!-- <CheckScanGate /> -->
 
             <!-- 3. Once ready, moves here and passes the gate -->
-            <CheckPassGate />
-            
+            <!-- <CheckPassGate /> -->
+
             <!-- 3. Once ready, moves here and runs the slalom -->
-            <RunSlalom />
-            
+            <!-- <RunSlalom /> -->
+
         </Sequence>
     </BehaviorTree>
 </root>

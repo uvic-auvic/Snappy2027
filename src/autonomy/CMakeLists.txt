@@ -10,29 +10,33 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
-find_package(Eigen3 REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(snappy_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(yaml_cpp_vendor REQUIRED)
 find_package(behaviortree_cpp REQUIRED)
 
-add_executable(planner src/planner.cpp)
-ament_target_dependencies(planner
+add_executable(bt_planner src/planner.cpp)
+
+ament_target_dependencies(
+  bt_planner
   rclcpp
   snappy_interfaces
   std_msgs
-  yaml_cpp_vendor
 )
-target_link_libraries(planner Eigen3::Eigen behaviortree_cpp::behaviortree_cpp)
+target_link_libraries(bt_planner behaviortree_cpp::behaviortree_cpp)
 
 install(
-  TARGETS planner
+  TARGETS bt_planner
   DESTINATION lib/${PROJECT_NAME}
 )
 
 install(
   DIRECTORY config/
+  DESTINATION share/${PROJECT_NAME}/config
+)
+
+install(
+  FILES src/bhvr_tree.xml
   DESTINATION share/${PROJECT_NAME}/config
 )
 

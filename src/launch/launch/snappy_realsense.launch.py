@@ -133,21 +133,17 @@ def generate_launch_description():
   #      ],
   #  )
 
-    task_file_path = Path(
-        get_package_share_directory("snappy_autonomy"),
-        "config",
-        "tasks_example.yaml"
-        )
-
     planner_node = TimerAction(
         period=6.7,
         actions=[
             Node(
                 package="snappy_autonomy",
-                executable="planner",
-                name="planner",
+                executable="bt_planner",
+                name="bt_planner",
                 output="screen",
-                parameters=[{"task_file": str(task_file_path)}]
+                parameters=[{"tree_file": str(Path(
+                    get_package_share_directory("snappy_autonomy"),
+                    "config", "bhvr_tree.xml"))}]
             )
         ],
     )
