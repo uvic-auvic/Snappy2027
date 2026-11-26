@@ -1,12 +1,12 @@
 #include "front_camera_vision.cpp"
 
-void FrontCameraVision::publish_detections(const std::vector<Detection> & detections,
+void CameraVision::publish_detections(const std::vector<Detection> & detections,
                                             const rclcpp::Time & timestamp,
                                             float inference_ms)
     {
         auto msg = snappy_interfaces::msg::DetectionArray();
         msg.header.stamp = timestamp;
-        msg.header.frame_id = "d455_color_optical_frame";
+        msg.header.frame_id = this->frame_id_; // "d455_color_optical_frame"
         msg.inference_time_ms = static_cast<uint32_t>(std::lround(inference_ms));
         msg.detections.reserve(detections.size());
 

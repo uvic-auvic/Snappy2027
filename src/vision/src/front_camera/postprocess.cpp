@@ -1,6 +1,6 @@
 #include "front_camera_vision"
 
-std::vector<Detection> FrontCameraVision::parse_segmentation_output(
+std::vector<Detection> CameraVision::parse_segmentation_output(
         const float * output0, const float * output1,
         int orig_w, int orig_h, float scale, int pad_x, int pad_y)
     {
@@ -59,7 +59,7 @@ std::vector<Detection> FrontCameraVision::parse_segmentation_output(
 
     // ---- Mask decoding: proto matmul -> sigmoid -> threshold -> contour ----
 
-std::vector<cv::Point2f> FrontCameraVision::decode_mask_polygon(
+std::vector<cv::Point2f> CameraVision::decode_mask_polygon(
         const std::vector<float> & mask_coeffs,
         const float * proto,
         const Detection & det,
@@ -138,7 +138,7 @@ std::vector<cv::Point2f> FrontCameraVision::decode_mask_polygon(
 
 /*
 USED??
-static float FrontCameraVision::compute_iou(const Anchor & a, const Anchor & b)
+static float CameraVision::compute_iou(const Anchor & a, const Anchor & b)
     {
         float x1 = std::max(a.x - a.w / 2.0f, b.x - b.w / 2.0f);
         float y1 = std::max(a.y - a.h / 2.0f, b.y - b.h / 2.0f);

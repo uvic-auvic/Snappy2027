@@ -101,7 +101,7 @@ FrontCameraVision::~FrontCameraVision()
     if (host_output0_) cudaFreeHost(host_output0_);
     if (host_output1_) cudaFreeHost(host_output1_);
     if (stream_) cudaStreamDestroy(stream_);
-}
+}   
 
 void FrontCameraVision::image_callback(
     const sensor_msgs::msg::Image::ConstSharedPtr & color_msg,

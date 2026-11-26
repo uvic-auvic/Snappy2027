@@ -1,6 +1,6 @@
 #include "front_camera_vision.hpp"
 
-std::vector<Detection> FrontCameraVision::run_inference(const cv::Mat & image, float & inference_ms)
+std::vector<Detection> CameraVision::run_inference(const cv::Mat & image, float & inference_ms)
     {
         auto t0 = std::chrono::steady_clock::now();
 

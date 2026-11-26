@@ -1,6 +1,6 @@
 #include "front_camera_vision.cpp"
 
-FrontCameraVision::float estimate_distance_m(
+CameraVision::float estimate_distance_m(
         const cv::Mat & depth_image,
         const std::string & depth_encoding,
         const Detection & det)

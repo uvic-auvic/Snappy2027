@@ -1,6 +1,6 @@
 #include "front_camera_vision.hpp"
 
-void FrontCameraVision::letterbox(const cv::Mat & src, cv::Mat & dst,
+void CameraVision::letterbox(const cv::Mat & src, cv::Mat & dst,
                    float & scale, int & pad_x, int & pad_y)
     {
         scale = std::min(static_cast<float>(input_w_) / src.cols,

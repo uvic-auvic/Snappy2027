@@ -53,7 +53,7 @@ if(WITH_CUDA)
     src/front_camera/publishing.cpp
   )
   set(bottom_camera_vision_SRCS
-    src/bottom_camera_vision.cpp
+    src/bottom_camera/bottom_camera_vision/.cpp
   )
   
   foreach(camera_node front_camera_vision bottom_camera_vision)
